@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>IRONLOG — Training Log</title>
+<meta name="description" content="A personal strength training tracker.">
+<meta name="theme-color" content="#15171A">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ===== HEADER ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="avatar">A</div>
+      <div class="brand-text">
+        <span class="brand-greeting">Hey, Ams 👋</span>
+        <span class="brand-name">IRON<span class="accent-text">LOG</span></span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="pill-stat" id="streakPill">
+        <span class="pill-stat-emoji">🔥</span>
+        <span id="streakCount">0</span>
+      </button>
+      <button class="icon-btn-round" id="openBackupModal" title="Backup your data">
+        <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== MAIN VIEWS ===== -->
+  <main class="views">
+
+    <!-- ---------- TODAY ---------- -->
+    <section class="view" id="view-today">
+      <div class="view-head">
+        <p class="eyebrow">Today's Session</p>
+        <h1 id="dayPicker" class="day-select"></h1>
+      </div>
+
+      <div class="day-switcher" id="daySwitcher"></div>
+
+      <div class="plate-progress-card" id="plateProgressCard">
+        <div class="plate-progress">
+          <svg viewBox="0 0 92 92" class="plate-ring">
+            <circle cx="46" cy="46" r="40" class="ring-track"/>
+            <circle cx="46" cy="46" r="40" class="ring-fill" id="ringFill"/>
+          </svg>
+          <div class="plate-progress-center">
+            <span id="setsCompleteCount">0</span>
+            <span class="plate-progress-sub">/ <span id="setsTotalCount">0</span> sets</span>
+          </div>
+        </div>
+        <div class="plate-progress-copy">
+          <span class="ppc-title">Keep going!</span>
+          <span class="ppc-sub">Log each set as you finish it</span>
+        </div>
+      </div>
+
+      <div id="exerciseList" class="exercise-list"></div>
+
+      <button class="btn-primary btn-finish" id="finishSessionBtn">Finish session</button>
+    </section>
+
+    <!-- ---------- STATS ---------- -->
+    <section class="view" id="view-stats" hidden>
+      <div class="view-head">
+        <p class="eyebrow">Progress</p>
+        <h1>Your numbers</h1>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="card chart-card">
+        <div class="chart-card-head">
+          <h3>Volume over time</h3>
+          <span class="muted">total weight × reps per session</span>
+        </div>
+        <canvas id="volumeChart" height="180"></canvas>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-card-head">
+          <h3>Exercise progress</h3>
+          <select id="exerciseSelect" class="select-mono"></select>
+        </div>
+        <canvas id="exerciseChart" height="180"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="chart-card-head">
+          <h3>Personal records</h3>
+          <span class="muted">est. 1RM (Epley)</span>
+        </div>
+        <div id="prTable" class="pr-table"></div>
+      </div>
+    </section>
+
+    <!-- ---------- PROGRAM ---------- -->
+    <section class="view" id="view-program" hidden>
+      <div class="view-head">
+        <p class="eyebrow">Your Split</p>
+        <h1>Program</h1>
+      </div>
+      <div id="programList" class="program-list"></div>
+    </section>
+
+    <!-- ---------- HISTORY ---------- -->
+    <section class="view" id="view-history" hidden>
+      <div class="view-head">
+        <p class="eyebrow">Log</p>
+        <h1>History</h1>
+      </div>
+      <div id="historyList" class="history-list"></div>
+    </section>
+
+  </main>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="tabbar">
+    <button class="tab-btn is-active" data-view="today">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 10h2v4H4v-4zm3-3h2v10H7V7zm3-2h2v14h-2V5zm3 2h2v10h-2V7zm3 3h2v4h-2v-4z" fill="currentColor"/></svg>
+      <span>Today</span>
+    </button>
+    <button class="tab-btn" data-view="stats">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 20V10M10 20V4M16 20v-7M20 20v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Stats</span>
+    </button>
+    <button class="tab-btn" data-view="program">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Program</span>
+    </button>
+    <button class="tab-btn" data-view="history">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>History</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- ===== SWAP MODAL ===== -->
+<div class="modal-backdrop" id="swapModalBackdrop" hidden>
+  <div class="modal" id="swapModal">
+    <div class="modal-head">
+      <h3>Swap exercise</h3>
+      <button class="icon-btn" id="closeSwapModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="swapOptions" class="swap-options"></div>
+      <div class="custom-add">
+        <input type="text" id="customExerciseInput" placeholder="Or type a custom exercise…" class="text-input">
+        <button class="btn-secondary" id="addCustomExercise">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EDIT TARGETS MODAL ===== -->
+<div class="modal-backdrop" id="editModalBackdrop" hidden>
+  <div class="modal modal-sm" id="editModal">
+    <div class="modal-head">
+      <h3>Edit targets</h3>
+      <button class="icon-btn" id="closeEditModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Target sets</label>
+      <input type="number" id="editSetsInput" class="text-input" min="1" max="10">
+      <label class="field-label">Target reps (or "45s" for timed)</label>
+      <input type="text" id="editRepsInput" class="text-input">
+      <button class="btn-primary" id="saveEditTargets">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BACKUP MODAL ===== -->
+<div class="modal-backdrop" id="backupModalBackdrop" hidden>
+  <div class="modal modal-sm" id="backupModal">
+    <div class="modal-head">
+      <h3>Backup & sync</h3>
+      <button class="icon-btn" id="closeBackupModal">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="syncStatusBlock"></div>
+
+      <div class="modal-divider">local backup</div>
+      <p class="modal-copy">Download a snapshot of your log, or restore one, regardless of sync status.</p>
+      <button class="btn-primary" id="exportDataBtn">⬇ Download backup</button>
+      <input type="file" id="importFileInput" accept="application/json" hidden>
+      <button class="btn-secondary btn-full" id="importDataBtn" style="margin-top:8px;">⬆ Restore backup</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== AUTH MODAL ===== -->
+<div class="modal-backdrop" id="authModalBackdrop" hidden>
+  <div class="modal modal-sm" id="authModal">
+    <div class="modal-head">
+      <h3 id="authModalTitle">Sign in to sync</h3>
+      <button class="icon-btn" id="closeAuthModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-copy">Same email + password on every device keeps your log in sync.</p>
+      <label class="field-label">Email</label>
+      <input type="email" id="authEmailInput" class="text-input" placeholder="you@example.com">
+      <label class="field-label">Password</label>
+      <input type="password" id="authPasswordInput" class="text-input" placeholder="At least 6 characters">
+      <div id="authError" class="auth-error" hidden></div>
+      <button class="btn-primary" id="authSubmitBtn">Sign in</button>
+      <button class="btn-secondary btn-full" id="authToggleModeBtn" style="margin-top:8px;">Need an account? Sign up</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

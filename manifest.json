@@ -1,0 +1,10 @@
+{
+  "name": "IronLog — Training Tracker",
+  "short_name": "IronLog",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#14161a",
+  "theme_color": "#14161a",
+  "description": "Personal strength training tracker with progress stats.",
+  "icons": []
+}
