@@ -355,6 +355,7 @@ input, select{ font-family: inherit; }
   position: fixed; inset:0; background: rgba(43,38,32,0.45); backdrop-filter: blur(2px);
   display:flex; align-items:flex-end; justify-content:center; z-index: 50;
 }
+.modal-backdrop[hidden]{ display:none !important; }
 .modal{
   width:100%; max-width: 560px; background: var(--bg-elevated);
   border: 1px solid var(--border); border-bottom: none;
