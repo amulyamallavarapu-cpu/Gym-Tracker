@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IRONLOG — Supabase configuration
+   GYM TRACKER — Supabase configuration
    Fill these in with your own project's values (Project Settings → API).
    Leaving them as-is keeps the app running in local-only (offline) mode.
    ========================================================================== */

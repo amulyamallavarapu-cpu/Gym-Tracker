@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IRONLOG — default program + exercise alternatives database
+   GYM TRACKER — default program + exercise alternatives database
    ========================================================================== */
 
 // Cheerful pastel palette — each day gets its own color-blocked identity.

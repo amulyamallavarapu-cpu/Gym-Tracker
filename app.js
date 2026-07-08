@@ -1,8 +1,9 @@
 /* ==========================================================================
-   IRONLOG — app logic
+   GYM TRACKER — app logic
    ========================================================================== */
 
-const STORAGE_KEY = "ironlog_v1";
+const STORAGE_KEY = "gymtracker_v1";
+const LEGACY_STORAGE_KEY = "ironlog_v1"; // migrate anyone who used the app before the rename
 
 let state = loadState();
 let ui = {
@@ -20,6 +21,16 @@ function loadState(){
     if(raw){
       const parsed = JSON.parse(raw);
       if(parsed && parsed.program) return parsed;
+    }
+    // migrate anyone who has data under the old IronLog key
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if(legacyRaw){
+      const legacyParsed = JSON.parse(legacyRaw);
+      if(legacyParsed && legacyParsed.program){
+        localStorage.setItem(STORAGE_KEY, legacyRaw);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        return legacyParsed;
+      }
     }
   }catch(e){ console.warn("Could not read saved data", e); }
   return {
@@ -618,7 +629,7 @@ document.getElementById("exportDataBtn").addEventListener("click", () => {
   const a = document.createElement("a");
   const dateStr = new Date().toISOString().slice(0, 10);
   a.href = url;
-  a.download = `ironlog-backup-${dateStr}.json`;
+  a.download = `gym-tracker-backup-${dateStr}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -687,7 +698,7 @@ async function restoreSession(){
 async function pullCloudState(initial){
   if(!supabaseClient || !currentUser) return;
   const { data, error } = await supabaseClient
-    .from("ironlog_states")
+    .from("gym_tracker_states")
     .select("data")
     .eq("user_id", currentUser.id)
     .maybeSingle();
@@ -722,7 +733,7 @@ async function pullCloudState(initial){
 async function pushCloudState(){
   if(!supabaseClient || !currentUser) return;
   const { error } = await supabaseClient
-    .from("ironlog_states")
+    .from("gym_tracker_states")
     .upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
   if(error) console.warn("Cloud sync failed", error);
 }
