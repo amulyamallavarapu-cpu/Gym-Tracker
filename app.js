@@ -119,6 +119,15 @@ function updateStreakBadge(){
   document.getElementById("streakCount").textContent = computeStreak();
 }
 
+function getLastPerformance(exerciseName){
+  // state.history is newest-first, so the first match is the most recent session
+  for(const sess of state.history){
+    const found = sess.exercises.find(e => e.name === exerciseName);
+    if(found && found.sets && found.sets.length) return found.sets;
+  }
+  return null;
+}
+
 function renderToday(){
   updateStreakBadge();
   renderDaySwitcher();
@@ -158,13 +167,17 @@ function renderToday(){
     `;
 
     const rowsWrap = card.querySelector(".set-rows");
+    const lastSets = getLastPerformance(ex.name);
     draft.forEach((s, idx) => {
       const row = document.createElement("div");
       row.className = "set-row";
+      const lastSet = lastSets && lastSets[idx];
+      const weightPlaceholder = lastSet ? String(lastSet.weight) : (ex.timed ? "sec" : "kg");
+      const repsPlaceholder = ex.timed ? "—" : (lastSet ? String(lastSet.reps) : "reps");
       row.innerHTML = `
         <span class="set-idx">${idx + 1}</span>
-        <input type="number" inputmode="decimal" placeholder="${ex.timed ? "sec" : "kg"}" value="${s.weight}" data-field="weight" data-idx="${idx}">
-        <input type="number" inputmode="numeric" placeholder="${ex.timed ? "—" : "reps"}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+        <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+        <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
         <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
       `;
       if(ex.timed){
@@ -499,9 +512,16 @@ function computePRs(){
 }
 
 function getAllExerciseNames(){
-  const names = new Set();
-  state.history.forEach(sess => sess.exercises.forEach(ex => { if(!ex.timed) names.add(ex.name); }));
-  return Array.from(names).sort();
+  const seen = new Set();
+  const ordered = [];
+  // state.history is newest-first, so this naturally orders by most recently logged
+  state.history.forEach(sess => sess.exercises.forEach(ex => {
+    if(!ex.timed && !seen.has(ex.name)){
+      seen.add(ex.name);
+      ordered.push(ex.name);
+    }
+  }));
+  return ordered;
 }
 
 function renderStats(){
@@ -535,8 +555,8 @@ function renderVolumeChart(){
   ui.charts.volume = new Chart(ctx, {
     type: "line",
     data: { labels, datasets: [{
-      data, borderColor: "#e8756e", backgroundColor: "rgba(243,165,160,0.35)",
-      fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: "#e8756e"
+      data, borderColor: "#ef6f9b", backgroundColor: "rgba(239,111,155,0.22)",
+      fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: "#ef6f9b"
     }]},
     options: chartBaseOptions()
   });
@@ -546,8 +566,21 @@ function renderExerciseSelectAndChart(){
   const select = document.getElementById("exerciseSelect");
   const names = getAllExerciseNames();
   const prevVal = select.value;
+
+  if(names.length === 0){
+    select.innerHTML = "";
+    select.hidden = true;
+    if(ui.charts.exercise) ui.charts.exercise.destroy();
+    document.getElementById("exerciseChart").hidden = true;
+    document.getElementById("exerciseHistoryTable").innerHTML =
+      `<div class="empty-state"><p>Log a few sessions to start seeing progress here.</p></div>`;
+    return;
+  }
+
+  select.hidden = false;
+  document.getElementById("exerciseChart").hidden = false;
   select.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join("");
-  if(names.includes(prevVal)) select.value = prevVal;
+  select.value = names.includes(prevVal) ? prevVal : names[0];
   select.onchange = renderExerciseChart;
   renderExerciseChart();
 }
@@ -562,6 +595,7 @@ function renderExerciseChart(){
     return;
   }
   const points = [];
+  const tableRows = []; // newest first, for the list below the chart
   [...state.history].reverse().forEach(sess => {
     sess.exercises.forEach(ex => {
       if(ex.name === name && !ex.timed && ex.sets.length){
@@ -570,6 +604,14 @@ function renderExerciseChart(){
       }
     });
   });
+  state.history.forEach(sess => {
+    sess.exercises.forEach(ex => {
+      if(ex.name === name && !ex.timed && ex.sets.length){
+        tableRows.push({ date: new Date(sess.date), sets: ex.sets });
+      }
+    });
+  });
+
   ui.charts.exercise = new Chart(ctx, {
     type: "line",
     data: {
@@ -582,6 +624,14 @@ function renderExerciseChart(){
     },
     options: chartBaseOptions()
   });
+
+  const tableWrap = document.getElementById("exerciseHistoryTable");
+  tableWrap.innerHTML = tableRows.slice(0, 8).map(row => `
+    <div class="pr-row">
+      <span class="pr-name">${row.date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+      <span class="pr-value">${row.sets.map(s => `${s.weight}×${s.reps}`).join(", ")}</span>
+    </div>
+  `).join("");
 }
 
 function chartBaseOptions(){

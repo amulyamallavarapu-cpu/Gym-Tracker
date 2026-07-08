@@ -1,7 +1,7 @@
 /* ==========================================================================
    GYM TRACKER — design tokens
    Palette: warm cream base, color-blocked pastel cards per training day.
-   Display type: Fredoka (rounded, friendly). Body: Poppins.
+   Display type: Fraunces (soft serif, still a little serious). Body: Poppins.
    Numeric inputs stay in JetBrains Mono for tidy alignment.
    ========================================================================== */
 
@@ -23,6 +23,9 @@
   --coral:       #f3a5a0;  --coral-ink:    #8c2a22; --coral-dim:   #fcebe9;
   --peach:       #f7c79c;  --peach-ink:    #8a4b14; --peach-dim:   #fdf0e2;
 
+  /* brand accent (used for non-day-specific UI: buttons, focus states, highlights) */
+  --pink:      #ef6f9b;  --pink-ink: #a23763; --pink-dim: #fce4ec;
+
   --pill-dark: #2b2620;
   --pill-dark-text: #fff8ec;
 
@@ -30,7 +33,7 @@
   --radius-md: 18px;
   --radius-lg: 28px;
 
-  --font-display: 'Fredoka', sans-serif;
+  --font-display: 'Fraunces', serif;
   --font-body: 'Poppins', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
@@ -48,13 +51,13 @@ body{
   min-height: 100vh;
 }
 
-::selection{ background: var(--coral); color: var(--coral-ink); }
+::selection{ background: var(--pink); color: #fff; }
 
 button{ font-family: inherit; cursor: pointer; }
 input, select{ font-family: inherit; }
 
 .muted{ color: var(--ink-2); font-size: 0.8rem; }
-.accent-text{ color: var(--coral); }
+.accent-text{ color: var(--pink); }
 
 /* ============ SHELL ============ */
 .app-shell{
@@ -76,7 +79,7 @@ input, select{ font-family: inherit; }
 .brand{ display:flex; align-items:center; gap:12px; }
 .avatar{
   width: 42px; height: 42px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--coral), var(--peach));
+  background: linear-gradient(135deg, var(--pink), var(--peach));
   color: #fff; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem;
   display:flex; align-items:center; justify-content:center;
   box-shadow: var(--shadow-soft);
@@ -86,7 +89,7 @@ input, select{ font-family: inherit; }
 .brand-name{
   font-family: var(--font-display);
   font-size: 1.3rem; font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 .topbar-actions{ display:flex; align-items:center; gap:8px; }
 .pill-stat{
@@ -111,11 +114,11 @@ input, select{ font-family: inherit; }
 .eyebrow{
   font-family: var(--font-mono);
   font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--coral-ink); margin: 0 0 4px; font-weight: 700;
+  color: var(--pink-ink); margin: 0 0 4px; font-weight: 700;
 }
 .view-head h1{
   font-family: var(--font-display);
-  font-size: 2rem; font-weight: 600; letter-spacing: 0.01em;
+  font-size: 2rem; font-weight: 600; letter-spacing: -0.01em;
   margin: 0; line-height: 1.1;
 }
 
@@ -139,14 +142,14 @@ input, select{ font-family: inherit; }
 }
 .day-chip .dot{ width:8px; height:8px; border-radius:50%; }
 .day-chip.is-active{
-  color: var(--ink); border-color: var(--chip-color, var(--coral));
-  background: var(--chip-dim, var(--coral-dim));
+  color: var(--ink); border-color: var(--chip-color, var(--pink));
+  background: var(--chip-dim, var(--pink-dim));
   transform: translateY(-1px);
 }
 
 /* ============ PLATE PROGRESS RING ============ */
 .plate-progress-card{
-  background: var(--chip-dim, var(--coral-dim));
+  background: var(--chip-dim, var(--pink-dim));
   border-radius: var(--radius-lg);
   padding: 20px;
   display:flex; align-items:center; gap: 18px;
@@ -157,7 +160,7 @@ input, select{ font-family: inherit; }
 .plate-ring{ width:100%; height:100%; transform: rotate(-90deg); }
 .ring-track{ fill:none; stroke: rgba(43,38,32,0.12); stroke-width: 9; }
 .ring-fill{
-  fill:none; stroke: var(--chip-color, var(--coral)); stroke-width: 9; stroke-linecap: round;
+  fill:none; stroke: var(--chip-color, var(--pink)); stroke-width: 9; stroke-linecap: round;
   stroke-dasharray: 251; stroke-dashoffset: 251;
   transition: stroke-dashoffset .4s ease;
 }
@@ -211,12 +214,12 @@ input, select{ font-family: inherit; }
   color: var(--ink); border-radius: var(--radius-sm); padding: 9px 8px;
   font-family: var(--font-mono); font-size: 0.88rem; text-align:center;
 }
-.set-row input:focus{ outline:none; border-color: var(--coral); }
+.set-row input:focus{ outline:none; border-color: var(--pink); }
 .set-row input::placeholder{ color: var(--ink-3); }
 .set-remove{
   background:none; border:none; color: var(--ink-3); font-size: 1rem;
 }
-.set-remove:hover{ color: var(--coral-ink); }
+.set-remove:hover{ color: var(--pink-ink); }
 
 .add-set-btn{
   margin-top: 8px; align-self:flex-start;
@@ -236,7 +239,7 @@ input, select{ font-family: inherit; }
 .btn-primary{
   width:100%; padding: 15px; border:none; border-radius: 999px;
   background: var(--pill-dark); color: var(--pill-dark-text); font-weight:600; font-size:0.95rem;
-  font-family: var(--font-display); letter-spacing: 0.01em;
+  font-family: var(--font-display); letter-spacing: -0.005em;
   transition: filter .15s, transform .1s;
 }
 .btn-primary:hover{ filter: brightness(1.15); }
@@ -270,7 +273,7 @@ input, select{ font-family: inherit; }
   font-family: var(--font-body);
 }
 .tab-btn svg{ width:20px; height:20px; }
-.tab-btn.is-active{ color: var(--coral-ink); }
+.tab-btn.is-active{ color: var(--pink-ink); }
 
 /* ============ CARDS (stats/program) ============ */
 .card{
@@ -288,7 +291,7 @@ input, select{ font-family: inherit; }
 }
 .stat-box:nth-child(1){ background: var(--butter-dim); }
 .stat-box:nth-child(2){ background: var(--lavender-dim); }
-.stat-box:nth-child(3){ background: var(--coral-dim); }
+.stat-box:nth-child(3){ background: var(--pink-dim); }
 .stat-box:nth-child(4){ background: var(--sage-dim); }
 .stat-box .stat-num{ font-family: var(--font-display); font-size: 1.7rem; font-weight:600; display:block; }
 .stat-box .stat-label{ font-size: 0.72rem; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
@@ -299,13 +302,14 @@ input, select{ font-family: inherit; }
 }
 
 .pr-table{ display:flex; flex-direction:column; gap:0; }
+.exercise-history-table{ margin-top: 14px; }
 .pr-row{
   display:flex; justify-content:space-between; align-items:baseline;
   padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.85rem;
 }
 .pr-row:last-child{ border-bottom:none; }
 .pr-row .pr-name{ font-weight:600; }
-.pr-row .pr-value{ font-family: var(--font-mono); color: var(--coral-ink); font-size:0.82rem; font-weight: 600; }
+.pr-row .pr-value{ font-family: var(--font-mono); color: var(--pink-ink); font-size:0.82rem; font-weight: 600; }
 
 /* ============ PROGRAM VIEW ============ */
 .program-list{ display:flex; flex-direction:column; gap:16px; }
@@ -343,7 +347,7 @@ input, select{ font-family: inherit; }
 .history-ex-line{ display:flex; justify-content:space-between; font-size: 0.82rem; padding: 5px 0; }
 .history-ex-line .hex-sets{ font-family: var(--font-mono); color: var(--ink-2); }
 .history-delete{ margin-top: 10px; background:none; border:none; color: var(--ink-3); font-size: 0.75rem; text-decoration: underline; }
-.history-delete:hover{ color: var(--coral-ink); }
+.history-delete:hover{ color: var(--pink-ink); }
 
 .empty-state{
   text-align:center; padding: 40px 20px; color: var(--ink-2);
@@ -376,19 +380,19 @@ input, select{ font-family: inherit; }
   border: 1.5px solid var(--border); background: var(--bg-card); color: var(--ink);
   font-size: 0.9rem; font-weight: 600;
 }
-.swap-option:hover{ border-color: var(--coral); }
-.swap-option.is-current{ border-color: var(--coral); background: var(--coral-dim); }
+.swap-option:hover{ border-color: var(--pink); }
+.swap-option.is-current{ border-color: var(--pink); background: var(--pink-dim); }
 
 .custom-add{ display:flex; gap:8px; }
 .text-input{
   width:100%; background: var(--bg-card); border: 1.5px solid var(--border); color: var(--ink);
   border-radius: var(--radius-sm); padding: 11px 14px; font-size: 0.88rem; margin-bottom: 10px;
 }
-.text-input:focus{ outline:none; border-color: var(--coral); }
+.text-input:focus{ outline:none; border-color: var(--pink); }
 .field-label{ font-size: 0.72rem; color: var(--ink-2); text-transform: uppercase; letter-spacing:0.04em; display:block; margin-bottom:5px; font-weight: 700; }
 
 .auth-error{
-  background: var(--coral-dim); color: var(--coral-ink); font-size: 0.8rem; font-weight: 600;
+  background: var(--pink-dim); color: var(--pink-ink); font-size: 0.8rem; font-weight: 600;
   padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 12px;
 }
 
@@ -434,5 +438,5 @@ input, select{ font-family: inherit; }
 
 /* focus visibility */
 button:focus-visible, input:focus-visible, select:focus-visible{
-  outline: 2px solid var(--lavender-ink); outline-offset: 2px;
+  outline: 2px solid var(--pink-ink); outline-offset: 2px;
 }
