@@ -4,5 +4,5 @@
    Leaving them as-is keeps the app running in local-only (offline) mode.
    ========================================================================== */
 
-const SUPABASE_URL = "https://zctumkqildwxtenhlizn.supabase.co/rest/v1/";
+const SUPABASE_URL = "https://zctumkqildwxtenhlizn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uuhELUuSb88vpbQaB309iw_lIKjyaMZ";
