@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>GYM TRACKER — Training Log</title>
+<title>Gym tracker — Training log</title>
 <meta name="description" content="A personal strength training tracker.">
 <meta name="theme-color" content="#fbf3e9">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,600&family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,7 +24,7 @@
       <div class="avatar">A</div>
       <div class="brand-text">
         <span class="brand-greeting">Hey, Ams 👋</span>
-        <span class="brand-name">GYM<span class="accent-text"> TRACKER</span></span>
+        <span class="brand-name">Gym<span class="accent-text"> tracker</span></span>
       </div>
     </div>
     <div class="topbar-actions">
@@ -55,8 +57,8 @@
             <circle cx="46" cy="46" r="40" class="ring-fill" id="ringFill"/>
           </svg>
           <div class="plate-progress-center">
-            <span id="setsCompleteCount">0</span>
-            <span class="plate-progress-sub">/ <span id="setsTotalCount">0</span> sets</span>
+            <span class="ppc-fraction"><span id="setsCompleteCount">0</span>/<span id="setsTotalCount">0</span></span>
+            <span class="plate-progress-sub">sets</span>
           </div>
         </div>
         <div class="plate-progress-copy">
@@ -111,6 +113,19 @@
         <p class="eyebrow">Your Split</p>
         <h1>Program</h1>
       </div>
+
+      <div class="card">
+        <div class="chart-card-head">
+          <h3>Exercise library</h3>
+          <span class="muted">every exercise you can pick from</span>
+        </div>
+        <div class="custom-add">
+          <input type="text" id="newLibraryExerciseInput" class="text-input" placeholder="Add a new exercise…">
+          <button class="btn-secondary" id="addLibraryExerciseBtn">Add</button>
+        </div>
+        <div id="exerciseLibraryList" class="library-chip-list"></div>
+      </div>
+
       <div id="programList" class="program-list"></div>
     </section>
 

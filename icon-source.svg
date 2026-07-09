@@ -1,0 +1,14 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#a23763"/>
+  <!-- dumbbell, centered, simple rounded-block silhouette in cream -->
+  <g fill="#fbf3e9">
+    <!-- left weight plates -->
+    <rect x="76" y="146" width="40" height="220" rx="14"/>
+    <rect x="128" y="176" width="30" height="160" rx="12"/>
+    <!-- bar -->
+    <rect x="158" y="234" width="196" height="44" rx="20"/>
+    <!-- right weight plates -->
+    <rect x="354" y="176" width="30" height="160" rx="12"/>
+    <rect x="396" y="146" width="40" height="220" rx="14"/>
+  </g>
+</svg>

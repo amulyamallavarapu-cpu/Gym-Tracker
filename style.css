@@ -1,7 +1,7 @@
 /* ==========================================================================
    GYM TRACKER — design tokens
    Palette: warm cream base, color-blocked pastel cards per training day.
-   Display type: Fraunces (soft serif, still a little serious). Body: Poppins.
+   Display and body type: Poppins throughout, for a single consistent voice.
    Numeric inputs stay in JetBrains Mono for tidy alignment.
    ========================================================================== */
 
@@ -33,7 +33,7 @@
   --radius-md: 18px;
   --radius-lg: 28px;
 
-  --font-display: 'Fraunces', serif;
+  --font-display: 'Poppins', system-ui, sans-serif;
   --font-body: 'Poppins', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
@@ -57,7 +57,7 @@ button{ font-family: inherit; cursor: pointer; }
 input, select{ font-family: inherit; }
 
 .muted{ color: var(--ink-2); font-size: 0.8rem; }
-.accent-text{ color: var(--pink); }
+.accent-text{ color: var(--pink-ink); }
 
 /* ============ SHELL ============ */
 .app-shell{
@@ -79,7 +79,7 @@ input, select{ font-family: inherit; }
 .brand{ display:flex; align-items:center; gap:12px; }
 .avatar{
   width: 42px; height: 42px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--pink), var(--peach));
+  background: linear-gradient(135deg, var(--pink-ink), var(--peach));
   color: #fff; font-family: var(--font-display); font-weight: 600; font-size: 1.1rem;
   display:flex; align-items:center; justify-content:center;
   box-shadow: var(--shadow-soft);
@@ -167,9 +167,10 @@ input, select{ font-family: inherit; }
 .plate-progress-center{
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
   font-family: var(--font-mono);
+  width: 68px; height: 68px; margin: auto; text-align: center; line-height: 1.1;
 }
-.plate-progress-center span:first-child{ font-size: 1.3rem; font-weight:700; }
-.plate-progress-sub{ font-size: 0.62rem; color: var(--ink-2); }
+.ppc-fraction{ font-size: 1.05rem; font-weight:700; white-space: nowrap; }
+.plate-progress-sub{ font-size: 0.58rem; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
 .plate-progress-copy{ display:flex; flex-direction:column; gap:2px; }
 .plate-progress-copy .ppc-title{ font-family: var(--font-display); font-size: 1.15rem; font-weight:600; }
 .plate-progress-copy .ppc-sub{ font-size: 0.82rem; color: var(--ink-2); }
@@ -301,6 +302,18 @@ input, select{ font-family: inherit; }
   border-radius: 999px; padding: 7px 14px; font-family: var(--font-mono); font-size: 0.8rem;
 }
 .select-full{ width: 100%; margin-bottom: 14px; }
+
+.library-chip-list{ display:flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.library-chip{
+  display:flex; align-items:center; gap:6px;
+  background: var(--bg-elevated); border: 1.5px solid var(--border); color: var(--ink);
+  padding: 7px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+}
+.library-chip.is-custom{ border-color: var(--pink); background: var(--pink-dim); }
+.library-chip button{
+  background:none; border:none; color: var(--ink-3); font-size: 0.85rem; line-height:1; padding:0;
+}
+.library-chip button:hover{ color: var(--pink-ink); }
 
 .history-view-head{ display:flex; align-items:flex-end; justify-content:space-between; gap: 10px; flex-wrap: wrap; }
 

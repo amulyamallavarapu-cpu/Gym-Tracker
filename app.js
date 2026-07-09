@@ -46,6 +46,7 @@ function loadState(){
     };
   }
   if(!loaded.dailyLogs) loaded.dailyLogs = {};
+  if(!loaded.exerciseLibrary) loaded.exerciseLibrary = [];
   return loaded;
 }
 
@@ -325,16 +326,30 @@ function finishSession(){
 function openSwapModal(dayId, exId){
   ui.swapTarget = { dayId, exId };
   const ex = findExercise(dayId, exId);
-  const options = getSwapOptions(ex.name);
+  const curated = getSwapOptions(ex.name);
+  const customOnes = (state.exerciseLibrary || []).filter(n => !curated.includes(n));
   const wrap = document.getElementById("swapOptions");
   wrap.innerHTML = "";
-  options.forEach(name => {
+  curated.forEach(name => {
     const btn = document.createElement("button");
     btn.className = "swap-option" + (name === ex.name ? " is-current" : "");
     btn.textContent = name;
     btn.addEventListener("click", () => applySwap(name));
     wrap.appendChild(btn);
   });
+  if(customOnes.length > 0){
+    const divider = document.createElement("div");
+    divider.className = "modal-divider";
+    divider.textContent = "from your library";
+    wrap.appendChild(divider);
+    customOnes.forEach(name => {
+      const btn = document.createElement("button");
+      btn.className = "swap-option" + (name === ex.name ? " is-current" : "");
+      btn.textContent = name;
+      btn.addEventListener("click", () => applySwap(name));
+      wrap.appendChild(btn);
+    });
+  }
   document.getElementById("customExerciseInput").value = "";
   document.getElementById("swapModalBackdrop").hidden = false;
 }
@@ -360,6 +375,8 @@ document.getElementById("addCustomExercise").addEventListener("click", () => {
   const input = document.getElementById("customExerciseInput");
   const val = input.value.trim();
   if(!val) return;
+  if(!state.exerciseLibrary) state.exerciseLibrary = [];
+  if(!getMasterExerciseList().includes(val)) state.exerciseLibrary.push(val);
   applySwap(val);
 });
 
@@ -400,6 +417,7 @@ document.getElementById("saveEditTargets").addEventListener("click", () => {
 /* PROGRAM VIEW                                                            */
 /* ---------------------------------------------------------------------- */
 function renderProgram(){
+  renderExerciseLibrary();
   const wrap = document.getElementById("programList");
   wrap.innerHTML = "";
   state.program.forEach(day => {
@@ -434,6 +452,56 @@ function renderProgram(){
     wrap.appendChild(block);
   });
 }
+
+function getMasterExerciseList(){
+  const names = new Set();
+  Object.keys(SWAP_GROUPS).forEach(k => names.add(k));
+  Object.values(SWAP_GROUPS).forEach(arr => arr.forEach(n => names.add(n)));
+  state.program.forEach(day => day.exercises.forEach(ex => names.add(ex.name)));
+  state.history.forEach(sess => sess.exercises.forEach(ex => names.add(ex.name)));
+  (state.exerciseLibrary || []).forEach(n => names.add(n));
+  return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function renderExerciseLibrary(){
+  const wrap = document.getElementById("exerciseLibraryList");
+  const names = getMasterExerciseList();
+  wrap.innerHTML = names.map(name => {
+    const isCustom = (state.exerciseLibrary || []).includes(name);
+    return `
+      <span class="library-chip ${isCustom ? "is-custom" : ""}">
+        ${name}
+        ${isCustom ? `<button data-action="remove-library" data-name="${name}" title="Remove">✕</button>` : ""}
+      </span>
+    `;
+  }).join("");
+  wrap.querySelectorAll('[data-action="remove-library"]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.exerciseLibrary = state.exerciseLibrary.filter(n => n !== btn.dataset.name);
+      saveState();
+      renderExerciseLibrary();
+    });
+  });
+}
+
+document.getElementById("addLibraryExerciseBtn").addEventListener("click", () => {
+  const input = document.getElementById("newLibraryExerciseInput");
+  const val = input.value.trim();
+  if(!val) return;
+  if(!state.exerciseLibrary) state.exerciseLibrary = [];
+  if(!state.exerciseLibrary.includes(val) && !getMasterExerciseList().includes(val)){
+    state.exerciseLibrary.push(val);
+  } else if(!state.exerciseLibrary.includes(val)){
+    // already exists elsewhere (built-in/history) but not marked custom — nothing to add
+    toast("Already in your library");
+    input.value = "";
+    return;
+  }
+  input.value = "";
+  saveState();
+  renderExerciseLibrary();
+  toast("Added to your library ✓");
+});
 
 /* ---------------------------------------------------------------------- */
 /* HISTORY VIEW                                                            */
