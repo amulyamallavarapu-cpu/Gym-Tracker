@@ -213,7 +213,7 @@ input, select{ font-family: inherit; }
 .set-row input{
   width:100%; background: var(--bg-elevated); border: 1.5px solid var(--border);
   color: var(--ink); border-radius: var(--radius-sm); padding: 9px 8px;
-  font-family: var(--font-mono); font-size: 0.88rem; text-align:center;
+  font-family: var(--font-mono); font-size: 1rem; text-align:center;
 }
 .set-row input:focus{ outline:none; border-color: var(--pink); }
 .set-row input::placeholder{ color: var(--ink-3); }
@@ -299,7 +299,7 @@ input, select{ font-family: inherit; }
 
 .select-mono{
   background: var(--bg-elevated); border: 1.5px solid var(--border); color: var(--ink);
-  border-radius: 999px; padding: 7px 14px; font-family: var(--font-mono); font-size: 0.8rem;
+  border-radius: 999px; padding: 7px 14px; font-family: var(--font-mono); font-size: 1rem;
 }
 .select-full{ width: 100%; margin-bottom: 14px; }
 
@@ -335,7 +335,7 @@ input, select{ font-family: inherit; }
 }
 .activity-row select, .activity-row input{
   background: var(--bg-elevated); border: 1.5px solid var(--border); color: var(--ink);
-  border-radius: var(--radius-sm); padding: 9px 8px; font-size: 0.82rem; text-align:center;
+  border-radius: var(--radius-sm); padding: 9px 8px; font-size: 1rem; text-align:center;
   font-family: var(--font-body);
 }
 
@@ -424,7 +424,7 @@ input, select{ font-family: inherit; }
 .custom-add{ display:flex; gap:8px; }
 .text-input{
   width:100%; background: var(--bg-card); border: 1.5px solid var(--border); color: var(--ink);
-  border-radius: var(--radius-sm); padding: 11px 14px; font-size: 0.88rem; margin-bottom: 10px;
+  border-radius: var(--radius-sm); padding: 11px 14px; font-size: 1rem; margin-bottom: 10px;
 }
 .text-input:focus{ outline:none; border-color: var(--pink); }
 .field-label{ font-size: 0.72rem; color: var(--ink-2); text-transform: uppercase; letter-spacing:0.04em; display:block; margin-bottom:5px; font-weight: 700; }

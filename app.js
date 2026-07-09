@@ -4,6 +4,7 @@
 
 const STORAGE_KEY = "gymtracker_v1";
 const LEGACY_STORAGE_KEY = "ironlog_v1"; // migrate anyone who used the app before the rename
+const LAST_SYNCED_KEY = "gymtracker_last_synced_at"; // device-local, not part of synced state itself
 
 let state = loadState();
 let ui = {
@@ -184,6 +185,7 @@ function renderToday(){
         <div class="ex-actions">
           <button class="icon-btn" data-action="edit" title="Edit targets"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="icon-btn" data-action="swap" title="Swap exercise">⇄</button>
+          <button class="icon-btn" data-action="delete-ex" title="Remove from program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m3 0v13a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
       <div class="set-labels">
@@ -194,52 +196,21 @@ function renderToday(){
     `;
 
     const rowsWrap = card.querySelector(".set-rows");
-    const lastSets = getLastPerformance(ex.name);
-    draft.forEach((s, idx) => {
-      const row = document.createElement("div");
-      row.className = "set-row";
-      const lastSet = lastSets && lastSets[idx];
-      const weightPlaceholder = lastSet ? String(lastSet.weight) : (ex.timed ? "sec" : "kg");
-      const repsPlaceholder = ex.timed ? "—" : (lastSet ? String(lastSet.reps) : "reps");
-      row.innerHTML = `
-        <span class="set-idx">${idx + 1}</span>
-        <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
-        <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
-        <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
-      `;
-      if(ex.timed){
-        row.querySelector('[data-field="reps"]').value = "1";
-      }
-      rowsWrap.appendChild(row);
-    });
-
-    // input events
-    rowsWrap.querySelectorAll("input").forEach(inp => {
-      inp.addEventListener("input", () => {
-        const idx = Number(inp.dataset.idx);
-        const field = inp.dataset.field;
-        draft[idx][field] = inp.value;
-        saveState();
-        updateProgressRing();
-        card.classList.toggle("is-done", draft.every(s => s.weight !== "" && s.reps !== ""));
-      });
-    });
-    rowsWrap.querySelectorAll('[data-action="remove-set"]').forEach(btn => {
-      btn.addEventListener("click", () => {
-        const idx = Number(btn.dataset.idx);
-        draft.splice(idx, 1);
-        saveState();
-        renderToday();
-      });
-    });
+    renderTodaySetRows(day, ex, rowsWrap, card);
 
     card.querySelector('[data-action="add-set"]').addEventListener("click", () => {
       draft.push({weight:"", reps: ex.timed ? "1" : ""});
       saveState();
-      renderToday();
+      renderTodaySetRows(day, ex, rowsWrap, card);
+      updateProgressRing();
+      // keep the keyboard up: focus straight into the new row instead of losing focus to a full re-render
+      const newRow = rowsWrap.lastElementChild;
+      const firstInput = newRow && newRow.querySelector("input:not([disabled])");
+      if(firstInput) firstInput.focus();
     });
     card.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id));
     card.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(day.id, ex.id));
+    card.querySelector('[data-action="delete-ex"]').addEventListener("click", () => deleteExerciseFromDay(day.id, ex.id));
 
     list.appendChild(card);
   });
@@ -247,6 +218,73 @@ function renderToday(){
   document.getElementById("setsCompleteCount").textContent = completeSets;
   document.getElementById("setsTotalCount").textContent = totalSets;
   updateProgressRing();
+}
+
+function renderTodaySetRows(day, ex, rowsWrap, card){
+  const draft = getDraft(day.id, ex.id, ex.sets, ex.timed);
+  const lastSets = getLastPerformance(ex.name);
+  rowsWrap.innerHTML = "";
+
+  draft.forEach((s, idx) => {
+    const row = document.createElement("div");
+    row.className = "set-row";
+    const lastSet = lastSets && lastSets[idx];
+    const weightPlaceholder = lastSet ? String(lastSet.weight) : (ex.timed ? "sec" : "kg");
+    const repsPlaceholder = ex.timed ? "—" : (lastSet ? String(lastSet.reps) : "reps");
+    row.innerHTML = `
+      <span class="set-idx">${idx + 1}</span>
+      <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+      <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+      <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
+    `;
+    if(ex.timed){
+      row.querySelector('[data-field="reps"]').value = "1";
+    }
+    rowsWrap.appendChild(row);
+
+    row.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const i = Number(inp.dataset.idx);
+        draft[i][inp.dataset.field] = inp.value;
+        saveState();
+        updateProgressRing();
+        card.classList.toggle("is-done", draft.every(s2 => s2.weight !== "" && s2.reps !== ""));
+      });
+    });
+    row.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
+      draft.splice(idx, 1);
+      saveState();
+      renderTodaySetRows(day, ex, rowsWrap, card);
+      updateProgressRing();
+    });
+  });
+}
+
+function addExerciseToDay(dayId){
+  const name = prompt("Exercise name:");
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  const day = findDay(dayId);
+  day.exercises.push({ id: uid("ex"), name: trimmed, sets: 3, reps: "8-12", timed: false });
+  if(!state.exerciseLibrary) state.exerciseLibrary = [];
+  if(!getMasterExerciseList().includes(trimmed)) state.exerciseLibrary.push(trimmed);
+  saveState();
+  toast(`Added "${trimmed}" to ${day.name}`);
+  renderProgram();
+}
+
+function deleteExerciseFromDay(dayId, exId){
+  const day = findDay(dayId);
+  const ex = findExercise(dayId, exId);
+  if(!ex) return;
+  if(!confirm(`Remove "${ex.name}" from ${day.name}? Past logged sessions won't be affected.`)) return;
+
+  day.exercises = day.exercises.filter(e => e.id !== exId);
+  if(state.draftsByDay[dayId]) delete state.draftsByDay[dayId][exId];
+  saveState();
+  toast(`Removed "${ex.name}"`);
+  if(ui.activeView === "today") renderToday();
+  if(ui.activeView === "program") renderProgram();
 }
 
 function updateProgressRing(){
@@ -430,6 +468,7 @@ function renderProgram(){
         <h3>${day.name}</h3>
       </div>
       <div class="program-ex-body"></div>
+      <button class="add-set-btn" data-action="add-exercise" type="button">+ Add exercise</button>
     `;
     const body = block.querySelector(".program-ex-body");
     day.exercises.forEach(ex => {
@@ -443,12 +482,15 @@ function renderProgram(){
         <div class="program-ex-btns">
           <button class="icon-btn" data-action="edit" title="Edit targets"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="icon-btn" data-action="swap" title="Swap exercise">⇄</button>
+          <button class="icon-btn" data-action="delete-ex" title="Remove from program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m3 0v13a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       `;
       row.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(day.id, ex.id));
       row.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id));
+      row.querySelector('[data-action="delete-ex"]').addEventListener("click", () => deleteExerciseFromDay(day.id, ex.id));
       body.appendChild(row);
     });
+    block.querySelector('[data-action="add-exercise"]').addEventListener("click", () => addExerciseToDay(day.id));
     wrap.appendChild(block);
   });
 }
@@ -1104,15 +1146,20 @@ async function pullCloudState(initial){
   if(!supabaseClient || !currentUser) return;
   const { data, error } = await supabaseClient
     .from("gym_tracker_states")
-    .select("data")
+    .select("data, updated_at")
     .eq("user_id", currentUser.id)
     .maybeSingle();
 
   if(error){ console.warn("Cloud fetch failed", error); return; }
 
+  const lastSyncedAt = localStorage.getItem(LAST_SYNCED_KEY);
+
   if(data && data.data){
     const hasLocalHistory = state.history && state.history.length > 0;
-    if(initial && hasLocalHistory){
+
+    if(!lastSyncedAt && hasLocalHistory){
+      // First time this device has ever synced, and both sides have real data —
+      // this is the one genuine case worth asking about, and only ever once.
       const useCloud = confirm(
         "Found existing cloud data for this account.\n\nOK = load the cloud version (replaces what's on this device)\nCancel = keep this device's data (overwrites the cloud)"
       );
@@ -1120,14 +1167,26 @@ async function pullCloudState(initial){
         state = data.data;
         if(!state.draftsByDay) state.draftsByDay = {};
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(LAST_SYNCED_KEY, data.updated_at || new Date().toISOString());
       } else {
         await pushCloudState();
       }
-    } else {
+    } else if(!lastSyncedAt){
+      // No local history to protect — safe to just take whatever the cloud has.
       state = data.data;
       if(!state.draftsByDay) state.draftsByDay = {};
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(LAST_SYNCED_KEY, data.updated_at || new Date().toISOString());
+    } else if(data.updated_at && new Date(data.updated_at) > new Date(lastSyncedAt)){
+      // We've synced before, and the cloud has genuinely newer data than we've seen
+      // (e.g. logged from another device) — safe to pull automatically, no prompt.
+      state = data.data;
+      if(!state.draftsByDay) state.draftsByDay = {};
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(LAST_SYNCED_KEY, data.updated_at);
     }
+    // else: cloud is not newer than what we've already synced — leave local alone.
+    // Any unsynced local edits will push up normally via scheduleCloudSync.
   } else {
     await pushCloudState();
   }
@@ -1137,10 +1196,15 @@ async function pullCloudState(initial){
 
 async function pushCloudState(){
   if(!supabaseClient || !currentUser) return;
+  const nowIso = new Date().toISOString();
   const { error } = await supabaseClient
     .from("gym_tracker_states")
-    .upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
-  if(error) console.warn("Cloud sync failed", error);
+    .upsert({ user_id: currentUser.id, data: state, updated_at: nowIso });
+  if(error){
+    console.warn("Cloud sync failed", error);
+  } else {
+    localStorage.setItem(LAST_SYNCED_KEY, nowIso);
+  }
 }
 
 function scheduleCloudSync(){
