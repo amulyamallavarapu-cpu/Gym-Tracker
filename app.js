@@ -201,11 +201,11 @@ function renderToday(){
     card.querySelector('[data-action="add-set"]').addEventListener("click", () => {
       draft.push({weight:"", reps: ex.timed ? "1" : ""});
       saveState();
-      renderTodaySetRows(day, ex, rowsWrap, card);
+      // append only the new row — existing rows/inputs are untouched, so nothing steals focus
+      const newRow = buildTodaySetRow(day, ex, draft, draft.length - 1, card, rowsWrap);
+      rowsWrap.appendChild(newRow);
       updateProgressRing();
-      // keep the keyboard up: focus straight into the new row instead of losing focus to a full re-render
-      const newRow = rowsWrap.lastElementChild;
-      const firstInput = newRow && newRow.querySelector("input:not([disabled])");
+      const firstInput = newRow.querySelector("input:not([disabled])");
       if(firstInput) firstInput.focus();
     });
     card.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id));
@@ -220,43 +220,49 @@ function renderToday(){
   updateProgressRing();
 }
 
+function buildTodaySetRow(day, ex, draft, idx, card, rowsWrap){
+  const lastSets = getLastPerformance(ex.name);
+  const s = draft[idx];
+  const row = document.createElement("div");
+  row.className = "set-row";
+  const lastSet = lastSets && lastSets[idx];
+  const weightPlaceholder = lastSet ? String(lastSet.weight) : (ex.timed ? "sec" : "kg");
+  const repsPlaceholder = ex.timed ? "—" : (lastSet ? String(lastSet.reps) : "reps");
+  row.innerHTML = `
+    <span class="set-idx">${idx + 1}</span>
+    <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+    <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+    <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
+  `;
+  if(ex.timed){
+    row.querySelector('[data-field="reps"]').value = "1";
+  }
+
+  row.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const i = Number(inp.dataset.idx);
+      draft[i][inp.dataset.field] = inp.value;
+      saveState();
+      updateProgressRing();
+      card.classList.toggle("is-done", draft.every(s2 => s2.weight !== "" && s2.reps !== ""));
+    });
+  });
+  row.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
+    const i = Number(row.querySelector('[data-action="remove-set"]').dataset.idx);
+    draft.splice(i, 1);
+    saveState();
+    renderTodaySetRows(day, ex, rowsWrap, card);
+    updateProgressRing();
+  });
+
+  return row;
+}
+
 function renderTodaySetRows(day, ex, rowsWrap, card){
   const draft = getDraft(day.id, ex.id, ex.sets, ex.timed);
-  const lastSets = getLastPerformance(ex.name);
   rowsWrap.innerHTML = "";
-
   draft.forEach((s, idx) => {
-    const row = document.createElement("div");
-    row.className = "set-row";
-    const lastSet = lastSets && lastSets[idx];
-    const weightPlaceholder = lastSet ? String(lastSet.weight) : (ex.timed ? "sec" : "kg");
-    const repsPlaceholder = ex.timed ? "—" : (lastSet ? String(lastSet.reps) : "reps");
-    row.innerHTML = `
-      <span class="set-idx">${idx + 1}</span>
-      <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
-      <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
-      <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
-    `;
-    if(ex.timed){
-      row.querySelector('[data-field="reps"]').value = "1";
-    }
-    rowsWrap.appendChild(row);
-
-    row.querySelectorAll("input").forEach(inp => {
-      inp.addEventListener("input", () => {
-        const i = Number(inp.dataset.idx);
-        draft[i][inp.dataset.field] = inp.value;
-        saveState();
-        updateProgressRing();
-        card.classList.toggle("is-done", draft.every(s2 => s2.weight !== "" && s2.reps !== ""));
-      });
-    });
-    row.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
-      draft.splice(idx, 1);
-      saveState();
-      renderTodaySetRows(day, ex, rowsWrap, card);
-      updateProgressRing();
-    });
+    rowsWrap.appendChild(buildTodaySetRow(day, ex, draft, idx, card, rowsWrap));
   });
 }
 
