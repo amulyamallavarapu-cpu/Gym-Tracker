@@ -116,9 +116,12 @@
 
     <!-- ---------- HISTORY ---------- -->
     <section class="view" id="view-history" hidden>
-      <div class="view-head">
-        <p class="eyebrow">Log</p>
-        <h1>History</h1>
+      <div class="view-head history-view-head">
+        <div>
+          <p class="eyebrow">Log</p>
+          <h1>History</h1>
+        </div>
+        <button class="btn-secondary" id="openLogEntryModal">+ Log an entry</button>
       </div>
       <div id="historyList" class="history-list"></div>
     </section>
@@ -217,6 +220,41 @@
       <div id="authError" class="auth-error" hidden></div>
       <button class="btn-primary" id="authSubmitBtn">Sign in</button>
       <button class="btn-secondary btn-full" id="authToggleModeBtn" style="margin-top:8px;">Need an account? Sign up</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOG ENTRY MODAL (past workouts + steps/activities) ===== -->
+<div class="modal-backdrop" id="logEntryModalBackdrop" hidden>
+  <div class="modal" id="logEntryModal">
+    <div class="modal-head">
+      <h3>Log an entry</h3>
+      <button class="icon-btn" id="closeLogEntryModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Date</label>
+      <input type="date" id="logEntryDate" class="text-input">
+
+      <div class="segmented" id="logEntryTypeToggle">
+        <button class="segmented-btn is-active" data-type="workout" type="button">Workout</button>
+        <button class="segmented-btn" data-type="activity" type="button">Steps & Activity</button>
+      </div>
+
+      <div id="logEntryWorkoutSection">
+        <label class="field-label">Day</label>
+        <select id="logEntryDaySelect" class="select-mono select-full"></select>
+        <div id="logEntryExerciseList"></div>
+      </div>
+
+      <div id="logEntryActivitySection" hidden>
+        <label class="field-label">Steps</label>
+        <input type="number" id="logEntrySteps" class="text-input" placeholder="e.g. 8000">
+        <label class="field-label">Activities</label>
+        <div id="logEntryActivitiesList"></div>
+        <button class="add-set-btn" id="addActivityRowBtn" type="button">+ Add activity</button>
+      </div>
+
+      <button class="btn-primary btn-full" id="saveLogEntryBtn" style="margin-top:18px;">Save entry</button>
     </div>
   </div>
 </div>

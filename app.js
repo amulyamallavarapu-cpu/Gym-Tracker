@@ -16,29 +16,55 @@ let ui = {
 };
 
 function loadState(){
+  let loaded = null;
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(parsed && parsed.program) return parsed;
+      if(parsed && parsed.program) loaded = parsed;
     }
-    // migrate anyone who has data under the old IronLog key
-    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if(legacyRaw){
-      const legacyParsed = JSON.parse(legacyRaw);
-      if(legacyParsed && legacyParsed.program){
-        localStorage.setItem(STORAGE_KEY, legacyRaw);
-        localStorage.removeItem(LEGACY_STORAGE_KEY);
-        return legacyParsed;
+    if(!loaded){
+      // migrate anyone who has data under the old IronLog key
+      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if(legacyRaw){
+        const legacyParsed = JSON.parse(legacyRaw);
+        if(legacyParsed && legacyParsed.program){
+          localStorage.setItem(STORAGE_KEY, legacyRaw);
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+          loaded = legacyParsed;
+        }
       }
     }
   }catch(e){ console.warn("Could not read saved data", e); }
-  return {
-    program: defaultProgram(),
-    history: [],
-    currentDayId: null,
-    draftsByDay: {}
-  };
+
+  if(!loaded){
+    loaded = {
+      program: defaultProgram(),
+      history: [],
+      currentDayId: null,
+      draftsByDay: {}
+    };
+  }
+  if(!loaded.dailyLogs) loaded.dailyLogs = {};
+  return loaded;
+}
+
+function sortHistoryDesc(){
+  state.history.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+function dateKeyFromInput(dateStr){
+  // dateStr is 'YYYY-MM-DD' from an <input type="date">
+  return dateStr;
+}
+
+function isoAtNoonFromDateInput(dateStr){
+  return new Date(dateStr + "T12:00:00").toISOString();
+}
+
+function todayDateInputValue(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
 function saveState(){
@@ -155,7 +181,7 @@ function renderToday(){
           <span class="ex-target">TARGET ${ex.sets} × ${ex.reps}${ex.timed ? "" : ""}</span>
         </div>
         <div class="ex-actions">
-          <button class="icon-btn" data-action="edit" title="Edit targets">⚙</button>
+          <button class="icon-btn" data-action="edit" title="Edit targets"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="icon-btn" data-action="swap" title="Swap exercise">⇄</button>
         </div>
       </div>
@@ -286,6 +312,7 @@ function finishSession(){
     exercises: loggedExercises
   };
   state.history.unshift(session);
+  sortHistoryDesc();
   state.draftsByDay[day.id] = {};
   saveState();
   toast("Session saved 🏁");
@@ -396,7 +423,7 @@ function renderProgram(){
           <span class="ptarget">${ex.sets} × ${ex.reps}</span>
         </div>
         <div class="program-ex-btns">
-          <button class="icon-btn" data-action="edit" title="Edit targets">⚙</button>
+          <button class="icon-btn" data-action="edit" title="Edit targets"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="icon-btn" data-action="swap" title="Swap exercise">⇄</button>
         </div>
       `;
@@ -411,59 +438,319 @@ function renderProgram(){
 /* ---------------------------------------------------------------------- */
 /* HISTORY VIEW                                                            */
 /* ---------------------------------------------------------------------- */
+const ACTIVITY_ICONS = {
+  Swimming: "🏊", Running: "🏃", Jogging: "🏃", Cycling: "🚴", Walking: "🚶", Yoga: "🧘", Other: "⚡"
+};
+
+function getHistoryItems(){
+  const items = [];
+  state.history.forEach(sess => items.push({ kind: "session", date: sess.date, data: sess }));
+  Object.keys(state.dailyLogs || {}).forEach(dateKey => {
+    const log = state.dailyLogs[dateKey];
+    if(log && (log.steps || (log.activities && log.activities.length))){
+      items.push({ kind: "activity", date: dateKey + "T12:00:00", data: log, dateKey });
+    }
+  });
+  items.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return items;
+}
+
 function renderHistory(){
   const wrap = document.getElementById("historyList");
   wrap.innerHTML = "";
 
-  if(state.history.length === 0){
+  const items = getHistoryItems();
+
+  if(items.length === 0){
     wrap.innerHTML = `
       <div class="empty-state">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.5"/></svg>
-        <p>No sessions logged yet.<br>Finish a workout on the Today tab to see it here.</p>
+        <p>Nothing logged yet.<br>Finish a workout on the Today tab, or tap "+ Log an entry" above.</p>
       </div>`;
     return;
   }
 
-  state.history.forEach(sess => {
-    const card = document.createElement("div");
-    card.className = "history-card";
-    const dateStr = new Date(sess.date).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
-    const isOpen = ui.openHistoryId === sess.id;
-
-    const totalVolume = sess.exercises.reduce((sum, ex) => sum + ex.sets.reduce((s2, s) => s2 + (ex.timed ? 0 : s.weight * s.reps), 0), 0);
-
-    card.innerHTML = `
-      <div class="history-card-head" data-action="toggle">
-        <div class="hc-left">
-          <span class="dot plate-${sess.plate}-dot"></span>
-          <h4>${sess.dayName}</h4>
-        </div>
-        <span class="history-date">${dateStr}</span>
-      </div>
-      <div class="history-detail ${isOpen ? "is-open" : ""}">
-        ${sess.exercises.map(ex => `
-          <div class="history-ex-line">
-            <span>${ex.name}</span>
-            <span class="hex-sets">${ex.sets.map(s => ex.timed ? `${s.weight}s` : `${s.weight}kg×${s.reps}`).join(", ")}</span>
-          </div>
-        `).join("")}
-        <div class="history-ex-line"><span class="muted">Total volume</span><span class="hex-sets">${Math.round(totalVolume)} kg</span></div>
-        <button class="history-delete" data-action="delete">Delete session</button>
-      </div>
-    `;
-    card.querySelector('[data-action="toggle"]').addEventListener("click", () => {
-      ui.openHistoryId = isOpen ? null : sess.id;
-      renderHistory();
-    });
-    card.querySelector('[data-action="delete"]')?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      state.history = state.history.filter(s => s.id !== sess.id);
-      saveState();
-      renderHistory();
-    });
-    wrap.appendChild(card);
+  items.forEach(item => {
+    if(item.kind === "session") wrap.appendChild(buildSessionCard(item.data));
+    else wrap.appendChild(buildActivityCard(item.data, item.dateKey));
   });
 }
+
+function buildSessionCard(sess){
+  const card = document.createElement("div");
+  card.className = "history-card";
+  const dateStr = new Date(sess.date).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
+  const isOpen = ui.openHistoryId === sess.id;
+
+  const totalVolume = sess.exercises.reduce((sum, ex) => sum + ex.sets.reduce((s2, s) => s2 + (ex.timed ? 0 : s.weight * s.reps), 0), 0);
+
+  card.innerHTML = `
+    <div class="history-card-head" data-action="toggle">
+      <div class="hc-left">
+        <span class="dot plate-${sess.plate}-dot"></span>
+        <h4>${sess.dayName}</h4>
+      </div>
+      <span class="history-date">${dateStr}</span>
+    </div>
+    <div class="history-detail ${isOpen ? "is-open" : ""}">
+      ${sess.exercises.map(ex => `
+        <div class="history-ex-line">
+          <span>${ex.name}</span>
+          <span class="hex-sets">${ex.sets.map(s => ex.timed ? `${s.weight}s` : `${s.weight}kg×${s.reps}`).join(", ")}</span>
+        </div>
+      `).join("")}
+      <div class="history-ex-line"><span class="muted">Total volume</span><span class="hex-sets">${Math.round(totalVolume)} kg</span></div>
+      <button class="history-delete" data-action="delete">Delete session</button>
+    </div>
+  `;
+  card.querySelector('[data-action="toggle"]').addEventListener("click", () => {
+    ui.openHistoryId = isOpen ? null : sess.id;
+    renderHistory();
+  });
+  card.querySelector('[data-action="delete"]')?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    state.history = state.history.filter(s => s.id !== sess.id);
+    saveState();
+    renderHistory();
+  });
+  return card;
+}
+
+function buildActivityCard(log, dateKey){
+  const card = document.createElement("div");
+  card.className = "history-card";
+  const syntheticId = "activity_" + dateKey;
+  const isOpen = ui.openHistoryId === syntheticId;
+  const dateStr = new Date(dateKey + "T12:00:00").toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
+
+  const activityLines = (log.activities || []).map(a => `
+    <div class="history-ex-line">
+      <span>${ACTIVITY_ICONS[a.type] || "⚡"} ${a.type}</span>
+      <span class="hex-sets">${a.duration} min${a.distance ? " · " + a.distance + " km" : ""}</span>
+    </div>
+  `).join("");
+
+  card.innerHTML = `
+    <div class="history-card-head" data-action="toggle">
+      <div class="hc-left">
+        <span class="dot plate-sage-dot"></span>
+        <h4>Steps & Activity</h4>
+      </div>
+      <span class="history-date">${dateStr}</span>
+    </div>
+    <div class="history-detail ${isOpen ? "is-open" : ""}">
+      ${log.steps ? `<div class="history-ex-line"><span>Steps</span><span class="hex-sets">${Number(log.steps).toLocaleString()}</span></div>` : ""}
+      ${activityLines}
+      <button class="history-delete" data-action="delete">Delete entry</button>
+    </div>
+  `;
+  card.querySelector('[data-action="toggle"]').addEventListener("click", () => {
+    ui.openHistoryId = isOpen ? null : syntheticId;
+    renderHistory();
+  });
+  card.querySelector('[data-action="delete"]')?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    delete state.dailyLogs[dateKey];
+    saveState();
+    renderHistory();
+  });
+  return card;
+}
+
+/* ---------------------------------------------------------------------- */
+/* LOG ENTRY MODAL (past workouts + steps/activities)                     */
+/* ---------------------------------------------------------------------- */
+const ACTIVITY_TYPES = ["Swimming", "Running", "Jogging", "Cycling", "Walking", "Yoga", "Other"];
+
+let logEntryState = { type: "workout", workoutDayId: null, workoutSets: {}, activities: [] };
+
+function openLogEntryModal(){
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateInputVal = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,"0")}-${String(yesterday.getDate()).padStart(2,"0")}`;
+
+  logEntryState = { type: "workout", workoutDayId: state.program[0].id, workoutSets: {}, activities: [] };
+  document.getElementById("logEntryDate").value = dateInputVal;
+
+  const daySelect = document.getElementById("logEntryDaySelect");
+  daySelect.innerHTML = state.program.map(d => `<option value="${d.id}">${d.name}</option>`).join("");
+  daySelect.value = logEntryState.workoutDayId;
+  renderLogEntryWorkoutExercises();
+
+  document.getElementById("logEntrySteps").value = "";
+  logEntryState.activities = [];
+  addLogEntryActivityRow();
+
+  setLogEntryType("workout");
+  document.getElementById("logEntryModalBackdrop").hidden = false;
+}
+
+function closeLogEntryModal(){
+  document.getElementById("logEntryModalBackdrop").hidden = true;
+}
+
+function setLogEntryType(type){
+  logEntryState.type = type;
+  document.querySelectorAll("#logEntryTypeToggle .segmented-btn").forEach(btn => {
+    btn.classList.toggle("is-active", btn.dataset.type === type);
+  });
+  document.getElementById("logEntryWorkoutSection").hidden = type !== "workout";
+  document.getElementById("logEntryActivitySection").hidden = type !== "activity";
+}
+
+function renderLogEntryWorkoutExercises(){
+  const day = findDay(logEntryState.workoutDayId);
+  const wrap = document.getElementById("logEntryExerciseList");
+  wrap.innerHTML = "";
+  day.exercises.forEach(ex => {
+    logEntryState.workoutSets[ex.id] = [{ weight: "", reps: ex.timed ? "1" : "" }];
+    const block = document.createElement("div");
+    block.className = "log-entry-exercise";
+    block.innerHTML = `
+      <span class="le-name">${ex.name}</span>
+      <div class="set-rows" data-ex="${ex.id}"></div>
+      <button class="add-set-btn" data-action="add-set" data-ex="${ex.id}" type="button">+ Add set</button>
+    `;
+    wrap.appendChild(block);
+    renderLogEntrySetRows(ex);
+    block.querySelector('[data-action="add-set"]').addEventListener("click", () => {
+      logEntryState.workoutSets[ex.id].push({ weight: "", reps: ex.timed ? "1" : "" });
+      renderLogEntrySetRows(ex);
+    });
+  });
+}
+
+function renderLogEntrySetRows(ex){
+  const rowsWrap = document.querySelector(`#logEntryExerciseList .set-rows[data-ex="${ex.id}"]`);
+  const sets = logEntryState.workoutSets[ex.id];
+  rowsWrap.innerHTML = "";
+  sets.forEach((s, idx) => {
+    const row = document.createElement("div");
+    row.className = "set-row";
+    row.innerHTML = `
+      <span class="set-idx">${idx + 1}</span>
+      <input type="number" inputmode="decimal" placeholder="${ex.timed ? "sec" : "kg"}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+      <input type="number" inputmode="numeric" placeholder="${ex.timed ? "—" : "reps"}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+      <button class="set-remove" data-action="remove-set" data-idx="${idx}" type="button">✕</button>
+    `;
+    rowsWrap.appendChild(row);
+    row.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        sets[Number(inp.dataset.idx)][inp.dataset.field] = inp.value;
+      });
+    });
+    row.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
+      sets.splice(idx, 1);
+      renderLogEntrySetRows(ex);
+    });
+  });
+}
+
+function addLogEntryActivityRow(){
+  logEntryState.activities.push({ id: uid("act"), type: "Swimming", duration: "", distance: "" });
+  renderLogEntryActivities();
+}
+
+function renderLogEntryActivities(){
+  const wrap = document.getElementById("logEntryActivitiesList");
+  wrap.innerHTML = "";
+  logEntryState.activities.forEach(act => {
+    const row = document.createElement("div");
+    row.className = "activity-row";
+    row.innerHTML = `
+      <select data-field="type" data-id="${act.id}">
+        ${ACTIVITY_TYPES.map(t => `<option value="${t}" ${act.type === t ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      <input type="number" inputmode="numeric" placeholder="min" value="${act.duration}" data-field="duration" data-id="${act.id}">
+      <input type="number" inputmode="decimal" placeholder="km" value="${act.distance}" data-field="distance" data-id="${act.id}">
+      <button class="set-remove" data-action="remove-activity" data-id="${act.id}" type="button">✕</button>
+    `;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll("select, input").forEach(el => {
+    const evt = el.tagName === "SELECT" ? "change" : "input";
+    el.addEventListener(evt, () => {
+      const act = logEntryState.activities.find(a => a.id === el.dataset.id);
+      if(act) act[el.dataset.field] = el.value;
+    });
+  });
+  wrap.querySelectorAll('[data-action="remove-activity"]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      logEntryState.activities = logEntryState.activities.filter(a => a.id !== btn.dataset.id);
+      renderLogEntryActivities();
+    });
+  });
+}
+
+document.getElementById("openLogEntryModal").addEventListener("click", openLogEntryModal);
+document.getElementById("closeLogEntryModal").addEventListener("click", closeLogEntryModal);
+document.getElementById("logEntryModalBackdrop").addEventListener("click", e => {
+  if(e.target.id === "logEntryModalBackdrop") closeLogEntryModal();
+});
+document.querySelectorAll("#logEntryTypeToggle .segmented-btn").forEach(btn => {
+  btn.addEventListener("click", () => setLogEntryType(btn.dataset.type));
+});
+document.getElementById("logEntryDaySelect").addEventListener("change", (e) => {
+  logEntryState.workoutDayId = e.target.value;
+  renderLogEntryWorkoutExercises();
+});
+document.getElementById("addActivityRowBtn").addEventListener("click", addLogEntryActivityRow);
+
+document.getElementById("saveLogEntryBtn").addEventListener("click", () => {
+  const dateVal = document.getElementById("logEntryDate").value;
+  if(!dateVal){ toast("Pick a date first"); return; }
+
+  if(logEntryState.type === "workout"){
+    const day = findDay(logEntryState.workoutDayId);
+    const loggedExercises = [];
+    day.exercises.forEach(ex => {
+      const sets = logEntryState.workoutSets[ex.id] || [];
+      const validSets = sets
+        .filter(s => s.weight !== "" && s.reps !== "")
+        .map(s => ({ weight: parseFloat(s.weight), reps: parseFloat(s.reps) }));
+      if(validSets.length > 0){
+        loggedExercises.push({ name: ex.name, sets: validSets, timed: !!ex.timed });
+      }
+    });
+    if(loggedExercises.length === 0){
+      toast("Log at least one set");
+      return;
+    }
+    const session = {
+      id: uid("sess"),
+      dayId: day.id,
+      dayName: day.name,
+      plate: day.plate,
+      date: isoAtNoonFromDateInput(dateVal),
+      exercises: loggedExercises
+    };
+    state.history.push(session);
+    sortHistoryDesc();
+    saveState();
+    closeLogEntryModal();
+    toast("Workout logged 📝");
+    if(ui.activeView === "history") renderHistory();
+    if(ui.activeView === "stats") renderStats();
+  } else {
+    const stepsVal = document.getElementById("logEntrySteps").value;
+    const activities = logEntryState.activities
+      .filter(a => a.duration !== "" && a.duration !== undefined && a.duration !== null)
+      .map(a => ({ type: a.type, duration: parseFloat(a.duration), distance: a.distance ? parseFloat(a.distance) : null }));
+
+    if(!stepsVal && activities.length === 0){
+      toast("Add steps or at least one activity");
+      return;
+    }
+    state.dailyLogs[dateVal] = {
+      steps: stepsVal ? parseInt(stepsVal, 10) : null,
+      activities
+    };
+    saveState();
+    closeLogEntryModal();
+    toast("Entry logged 📝");
+    if(ui.activeView === "history") renderHistory();
+  }
+});
 
 /* ---------------------------------------------------------------------- */
 /* STATS VIEW                                                              */
