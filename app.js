@@ -85,7 +85,7 @@ function findExercise(dayId, exId){
 function getDraft(dayId, exId, targetSets, timed){
   if(!state.draftsByDay[dayId]) state.draftsByDay[dayId] = {};
   if(!state.draftsByDay[dayId][exId]){
-    state.draftsByDay[dayId][exId] = Array.from({length: targetSets}, () => ({weight:"", reps: timed ? "1" : ""}));
+    state.draftsByDay[dayId][exId] = Array.from({length: targetSets}, () => ({weight:"", reps: timed ? "1" : "", warmup:false, isDropset:false, drops:[]}));
   }
   return state.draftsByDay[dayId][exId];
 }
@@ -199,7 +199,7 @@ function renderToday(){
     renderTodaySetRows(day, ex, rowsWrap, card);
 
     card.querySelector('[data-action="add-set"]').addEventListener("click", () => {
-      draft.push({weight:"", reps: ex.timed ? "1" : ""});
+      draft.push({weight:"", reps: ex.timed ? "1" : "", warmup:false, isDropset:false, drops:[]});
       saveState();
       // append only the new row — existing rows/inputs are untouched, so nothing steals focus
       const newRow = buildTodaySetRow(day, ex, draft, draft.length - 1, card, rowsWrap);
@@ -220,25 +220,72 @@ function renderToday(){
   updateProgressRing();
 }
 
+function renderDropRows(s, dropWrap){
+  dropWrap.innerHTML = "";
+  s.drops.forEach((d, di) => {
+    const drow = document.createElement("div");
+    drow.className = "drop-row";
+    drow.innerHTML = `
+      <span class="drop-arrow">↳</span>
+      <input type="number" inputmode="decimal" placeholder="kg" value="${d.weight}" data-drop-field="weight">
+      <input type="number" inputmode="numeric" placeholder="reps" value="${d.reps}" data-drop-field="reps">
+      <button class="set-remove" data-action="remove-drop">✕</button>
+    `;
+    drow.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        d[inp.dataset.dropField] = inp.value;
+        saveState();
+      });
+    });
+    drow.querySelector('[data-action="remove-drop"]').addEventListener("click", () => {
+      s.drops.splice(di, 1);
+      saveState();
+      renderDropRows(s, dropWrap);
+    });
+    dropWrap.appendChild(drow);
+  });
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "add-drop-btn";
+  addBtn.textContent = "+ Add drop";
+  addBtn.addEventListener("click", () => {
+    s.drops.push({ weight: "", reps: "" });
+    saveState();
+    renderDropRows(s, dropWrap);
+  });
+  dropWrap.appendChild(addBtn);
+}
+
 function buildTodaySetRow(day, ex, draft, idx, card, rowsWrap){
   const lastSets = getLastPerformance(ex.name);
   const s = draft[idx];
-  const row = document.createElement("div");
-  row.className = "set-row";
+  if(s.warmup === undefined) s.warmup = false;
+  if(s.isDropset === undefined) s.isDropset = false;
+  if(!s.drops) s.drops = [];
+
+  const entry = document.createElement("div");
+  entry.className = "set-entry";
   const lastSet = lastSets && lastSets[idx];
   const weightPlaceholder = lastSet ? String(lastSet.weight) : (ex.timed ? "sec" : "kg");
   const repsPlaceholder = ex.timed ? "—" : (lastSet ? String(lastSet.reps) : "reps");
-  row.innerHTML = `
-    <span class="set-idx">${idx + 1}</span>
-    <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
-    <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
-    <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
+  entry.innerHTML = `
+    <div class="set-row">
+      <span class="set-idx">${idx + 1}</span>
+      <input type="number" inputmode="decimal" placeholder="${weightPlaceholder}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+      <input type="number" inputmode="numeric" placeholder="${repsPlaceholder}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+      <button class="set-remove" data-action="remove-set" data-idx="${idx}">✕</button>
+    </div>
+    <div class="set-tags">
+      <button type="button" class="tag-toggle${s.warmup ? " is-active" : ""}" data-action="toggle-warmup">Warmup</button>
+      <button type="button" class="tag-toggle${s.isDropset ? " is-active" : ""}" data-action="toggle-dropset">Dropset</button>
+    </div>
+    <div class="drop-rows"${s.isDropset ? "" : " hidden"}></div>
   `;
   if(ex.timed){
-    row.querySelector('[data-field="reps"]').value = "1";
+    entry.querySelector('[data-field="reps"]').value = "1";
   }
 
-  row.querySelectorAll("input").forEach(inp => {
+  entry.querySelectorAll(".set-row input").forEach(inp => {
     inp.addEventListener("input", () => {
       const i = Number(inp.dataset.idx);
       draft[i][inp.dataset.field] = inp.value;
@@ -247,15 +294,28 @@ function buildTodaySetRow(day, ex, draft, idx, card, rowsWrap){
       card.classList.toggle("is-done", draft.every(s2 => s2.weight !== "" && s2.reps !== ""));
     });
   });
-  row.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
-    const i = Number(row.querySelector('[data-action="remove-set"]').dataset.idx);
+  entry.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
+    const i = Number(entry.querySelector('[data-action="remove-set"]').dataset.idx);
     draft.splice(i, 1);
     saveState();
     renderTodaySetRows(day, ex, rowsWrap, card);
     updateProgressRing();
   });
+  entry.querySelector('[data-action="toggle-warmup"]').addEventListener("click", (e) => {
+    s.warmup = !s.warmup;
+    saveState();
+    e.currentTarget.classList.toggle("is-active", s.warmup);
+  });
+  entry.querySelector('[data-action="toggle-dropset"]').addEventListener("click", () => {
+    s.isDropset = !s.isDropset;
+    if(!s.isDropset) s.drops = [];
+    saveState();
+    renderTodaySetRows(day, ex, rowsWrap, card);
+  });
 
-  return row;
+  renderDropRows(s, entry.querySelector(".drop-rows"));
+
+  return entry;
 }
 
 function renderTodaySetRows(day, ex, rowsWrap, card){
@@ -337,7 +397,14 @@ function finishSession(){
     const draft = getDraft(day.id, ex.id, ex.sets, ex.timed);
     const validSets = draft
       .filter(s => s.weight !== "" && s.reps !== "")
-      .map(s => ({ weight: parseFloat(s.weight), reps: parseFloat(s.reps) }));
+      .map(s => ({
+        weight: parseFloat(s.weight),
+        reps: parseFloat(s.reps),
+        warmup: !!s.warmup,
+        drops: (s.drops || [])
+          .filter(d => d.weight !== "" && d.reps !== "")
+          .map(d => ({ weight: parseFloat(d.weight), reps: parseFloat(d.reps) }))
+      }));
     if(validSets.length > 0){
       loggedExercises.push({ name: ex.name, sets: validSets, timed: !!ex.timed });
     }
@@ -448,7 +515,7 @@ document.getElementById("saveEditTargets").addEventListener("click", () => {
   // adjust draft length if it exists
   const draft = state.draftsByDay[dayId] && state.draftsByDay[dayId][exId];
   if(draft){
-    while(draft.length < newSets) draft.push({weight:"", reps:""});
+    while(draft.length < newSets) draft.push({weight:"", reps:"", warmup:false, isDropset:false, drops:[]});
     while(draft.length > newSets) draft.pop();
   }
   saveState();
@@ -552,6 +619,31 @@ document.getElementById("addLibraryExerciseBtn").addEventListener("click", () =>
 });
 
 /* ---------------------------------------------------------------------- */
+/* SET HELPERS (warmup exclusion + dropset flattening)                    */
+/* ---------------------------------------------------------------------- */
+// Returns the sets that should count toward volume/PRs/charts:
+// warmup-tagged sets are excluded entirely; dropset stages are included
+// as additional working sets alongside the main set.
+function flattenCountableSets(ex){
+  const out = [];
+  (ex.sets || []).forEach(s => {
+    if(s.warmup) return;
+    out.push({ weight: s.weight, reps: s.reps });
+    (s.drops || []).forEach(d => out.push({ weight: d.weight, reps: d.reps }));
+  });
+  return out;
+}
+
+function formatSetDisplay(s, timed){
+  let str = timed ? `${s.weight}s` : `${s.weight}kg×${s.reps}`;
+  if(s.drops && s.drops.length){
+    str += " → " + s.drops.map(d => timed ? `${d.weight}s` : `${d.weight}kg×${d.reps}`).join(" → ");
+  }
+  if(s.warmup) str += " · warmup";
+  return str;
+}
+
+/* ---------------------------------------------------------------------- */
 /* HISTORY VIEW                                                            */
 /* ---------------------------------------------------------------------- */
 const ACTIVITY_ICONS = {
@@ -598,7 +690,7 @@ function buildSessionCard(sess){
   const dateStr = new Date(sess.date).toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
   const isOpen = ui.openHistoryId === sess.id;
 
-  const totalVolume = sess.exercises.reduce((sum, ex) => sum + ex.sets.reduce((s2, s) => s2 + (ex.timed ? 0 : s.weight * s.reps), 0), 0);
+  const totalVolume = sess.exercises.reduce((sum, ex) => sum + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s2, s) => s2 + s.weight * s.reps, 0)), 0);
 
   card.innerHTML = `
     <div class="history-card-head" data-action="toggle">
@@ -612,7 +704,7 @@ function buildSessionCard(sess){
       ${sess.exercises.map(ex => `
         <div class="history-ex-line">
           <span>${ex.name}</span>
-          <span class="hex-sets">${ex.sets.map(s => ex.timed ? `${s.weight}s` : `${s.weight}kg×${s.reps}`).join(", ")}</span>
+          <span class="hex-sets">${ex.sets.map(s => formatSetDisplay(s, ex.timed)).join(", ")}</span>
         </div>
       `).join("")}
       <div class="history-ex-line"><span class="muted">Total volume</span><span class="hex-sets">${Math.round(totalVolume)} kg</span></div>
@@ -719,7 +811,7 @@ function renderLogEntryWorkoutExercises(){
   const wrap = document.getElementById("logEntryExerciseList");
   wrap.innerHTML = "";
   day.exercises.forEach(ex => {
-    logEntryState.workoutSets[ex.id] = [{ weight: "", reps: ex.timed ? "1" : "" }];
+    logEntryState.workoutSets[ex.id] = [{ weight: "", reps: ex.timed ? "1" : "", warmup:false, isDropset:false, drops:[] }];
     const block = document.createElement("div");
     block.className = "log-entry-exercise";
     block.innerHTML = `
@@ -730,7 +822,7 @@ function renderLogEntryWorkoutExercises(){
     wrap.appendChild(block);
     renderLogEntrySetRows(ex);
     block.querySelector('[data-action="add-set"]').addEventListener("click", () => {
-      logEntryState.workoutSets[ex.id].push({ weight: "", reps: ex.timed ? "1" : "" });
+      logEntryState.workoutSets[ex.id].push({ weight: "", reps: ex.timed ? "1" : "", warmup:false, isDropset:false, drops:[] });
       renderLogEntrySetRows(ex);
     });
   });
@@ -741,24 +833,45 @@ function renderLogEntrySetRows(ex){
   const sets = logEntryState.workoutSets[ex.id];
   rowsWrap.innerHTML = "";
   sets.forEach((s, idx) => {
-    const row = document.createElement("div");
-    row.className = "set-row";
-    row.innerHTML = `
-      <span class="set-idx">${idx + 1}</span>
-      <input type="number" inputmode="decimal" placeholder="${ex.timed ? "sec" : "kg"}" value="${s.weight}" data-field="weight" data-idx="${idx}">
-      <input type="number" inputmode="numeric" placeholder="${ex.timed ? "—" : "reps"}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
-      <button class="set-remove" data-action="remove-set" data-idx="${idx}" type="button">✕</button>
+    if(s.warmup === undefined) s.warmup = false;
+    if(s.isDropset === undefined) s.isDropset = false;
+    if(!s.drops) s.drops = [];
+
+    const entry = document.createElement("div");
+    entry.className = "set-entry";
+    entry.innerHTML = `
+      <div class="set-row">
+        <span class="set-idx">${idx + 1}</span>
+        <input type="number" inputmode="decimal" placeholder="${ex.timed ? "sec" : "kg"}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+        <input type="number" inputmode="numeric" placeholder="${ex.timed ? "—" : "reps"}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+        <button class="set-remove" data-action="remove-set" data-idx="${idx}" type="button">✕</button>
+      </div>
+      <div class="set-tags">
+        <button type="button" class="tag-toggle${s.warmup ? " is-active" : ""}" data-action="toggle-warmup">Warmup</button>
+        <button type="button" class="tag-toggle${s.isDropset ? " is-active" : ""}" data-action="toggle-dropset">Dropset</button>
+      </div>
+      <div class="drop-rows"${s.isDropset ? "" : " hidden"}></div>
     `;
-    rowsWrap.appendChild(row);
-    row.querySelectorAll("input").forEach(inp => {
+    rowsWrap.appendChild(entry);
+    entry.querySelectorAll(".set-row input").forEach(inp => {
       inp.addEventListener("input", () => {
         sets[Number(inp.dataset.idx)][inp.dataset.field] = inp.value;
       });
     });
-    row.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
+    entry.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
       sets.splice(idx, 1);
       renderLogEntrySetRows(ex);
     });
+    entry.querySelector('[data-action="toggle-warmup"]').addEventListener("click", (e) => {
+      s.warmup = !s.warmup;
+      e.currentTarget.classList.toggle("is-active", s.warmup);
+    });
+    entry.querySelector('[data-action="toggle-dropset"]').addEventListener("click", () => {
+      s.isDropset = !s.isDropset;
+      if(!s.isDropset) s.drops = [];
+      renderLogEntrySetRows(ex);
+    });
+    renderDropRows(s, entry.querySelector(".drop-rows"));
   });
 }
 
@@ -823,7 +936,14 @@ document.getElementById("saveLogEntryBtn").addEventListener("click", () => {
       const sets = logEntryState.workoutSets[ex.id] || [];
       const validSets = sets
         .filter(s => s.weight !== "" && s.reps !== "")
-        .map(s => ({ weight: parseFloat(s.weight), reps: parseFloat(s.reps) }));
+        .map(s => ({
+          weight: parseFloat(s.weight),
+          reps: parseFloat(s.reps),
+          warmup: !!s.warmup,
+          drops: (s.drops || [])
+            .filter(d => d.weight !== "" && d.reps !== "")
+            .map(d => ({ weight: parseFloat(d.weight), reps: parseFloat(d.reps) }))
+        }));
       if(validSets.length > 0){
         loggedExercises.push({ name: ex.name, sets: validSets, timed: !!ex.timed });
       }
@@ -893,7 +1013,7 @@ function computeStats(){
   const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
   const thisWeek = state.history.filter(s => new Date(s.date) >= weekAgo).length;
   const totalVolume = state.history.reduce((sum, sess) =>
-    sum + sess.exercises.reduce((s2, ex) => s2 + ex.sets.reduce((s3, s) => s3 + (ex.timed ? 0 : s.weight * s.reps), 0), 0), 0);
+    sum + sess.exercises.reduce((s2, ex) => s2 + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s3, s) => s3 + s.weight * s.reps, 0)), 0), 0);
   const streak = computeStreak();
   return { totalWorkouts, thisWeek, totalVolume, streak };
 }
@@ -903,7 +1023,7 @@ function computePRs(){
   state.history.forEach(sess => {
     sess.exercises.forEach(ex => {
       if(ex.timed) return;
-      ex.sets.forEach(s => {
+      flattenCountableSets(ex).forEach(s => {
         const oneRM = s.weight * (1 + s.reps / 30); // Epley
         if(!prs[ex.name] || oneRM > prs[ex.name].oneRM){
           prs[ex.name] = { oneRM, weight: s.weight, reps: s.reps };
@@ -948,7 +1068,7 @@ function renderVolumeChart(){
   const ctx = document.getElementById("volumeChart");
   const sessions = [...state.history].reverse().slice(-20);
   const labels = sessions.map(s => new Date(s.date).toLocaleDateString(undefined, {month:"short", day:"numeric"}));
-  const data = sessions.map(s => Math.round(s.exercises.reduce((sum, ex) => sum + ex.sets.reduce((s2, st) => s2 + (ex.timed?0:st.weight*st.reps), 0), 0)));
+  const data = sessions.map(s => Math.round(s.exercises.reduce((sum, ex) => sum + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s2, st) => s2 + st.weight*st.reps, 0)), 0)));
 
   if(ui.charts.volume) ui.charts.volume.destroy();
   if(sessions.length === 0){
@@ -1002,7 +1122,9 @@ function renderExerciseChart(){
   [...state.history].reverse().forEach(sess => {
     sess.exercises.forEach(ex => {
       if(ex.name === name && !ex.timed && ex.sets.length){
-        const top = Math.max(...ex.sets.map(s => s.weight));
+        const countable = flattenCountableSets(ex);
+        if(countable.length === 0) return;
+        const top = Math.max(...countable.map(s => s.weight));
         points.push({ date: new Date(sess.date), weight: top });
       }
     });
@@ -1032,7 +1154,7 @@ function renderExerciseChart(){
   tableWrap.innerHTML = tableRows.slice(0, 8).map(row => `
     <div class="pr-row">
       <span class="pr-name">${row.date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-      <span class="pr-value">${row.sets.map(s => `${s.weight}×${s.reps}`).join(", ")}</span>
+      <span class="pr-value">${row.sets.map(s => formatSetDisplay(s, false)).join(", ")}</span>
     </div>
   `).join("");
 }

@@ -23,7 +23,7 @@ function defaultProgram() {
       exercises: [
         { id: uid("ex"), name: "Bench Press",     sets: 4, reps: "6-8",   timed: false },
         { id: uid("ex"), name: "Lat Pulldown",     sets: 3, reps: "10-12",timed: false },
-        { id: uid("ex"), name: "Barbell Row",      sets: 3, reps: "8-10", timed: false },
+        { id: uid("ex"), name: "Seated Cable Row", sets: 3, reps: "8-10", timed: false },
         { id: uid("ex"), name: "Shoulder Press",   sets: 3, reps: "8-10", timed: false },
         { id: uid("ex"), name: "Rear Delt Fly",    sets: 3, reps: "12-15",timed: false }
       ]
@@ -34,8 +34,7 @@ function defaultProgram() {
         { id: uid("ex"), name: "Back Squat",           sets: 4, reps: "6-8",  timed: false },
         { id: uid("ex"), name: "Hamstring Curl",        sets: 3, reps: "10-12",timed: false },
         { id: uid("ex"), name: "Hip Abduction (in)",    sets: 3, reps: "15",  timed: false },
-        { id: uid("ex"), name: "Calf Raise",            sets: 3, reps: "12-15",timed: false },
-        { id: uid("ex"), name: "Tibialis / Shin Raise", sets: 2, reps: "15",  timed: false }
+        { id: uid("ex"), name: "Calf Raise",            sets: 3, reps: "12-15",timed: false }
       ]
     },
     {
@@ -75,7 +74,7 @@ function defaultProgram() {
 const SWAP_GROUPS = {
   "Bench Press":            ["Bench Press","Incline DB Press","Machine Chest Press","Push Ups","Weighted Dips"],
   "Lat Pulldown":           ["Lat Pulldown","Pull Ups","Assisted Pull Up","Straight Arm Pulldown"],
-  "Barbell Row":            ["Barbell Row","Seated Cable Row","T-Bar Row","Chest Supported Row","Single Arm DB Row"],
+  "Seated Cable Row":       ["Seated Cable Row","Barbell Row","T-Bar Row","Chest Supported Row","Single Arm DB Row"],
   "Shoulder Press":         ["Shoulder Press","Barbell OHP","Arnold Press","Machine Shoulder Press"],
   "Rear Delt Fly":          ["Rear Delt Fly","Reverse Pec Deck","Face Pull","Band Pull Apart"],
   "Back Squat":             ["Back Squat","Front Squat","Hack Squat","Leg Press","Goblet Squat"],
