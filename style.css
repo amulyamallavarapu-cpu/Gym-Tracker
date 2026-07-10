@@ -222,42 +222,28 @@ input, select{ font-family: inherit; }
 }
 .set-remove:hover{ color: var(--pink-ink); }
 
-.set-entry{ display:flex; flex-direction:column; gap:6px; }
-.set-tags{ display:flex; gap:6px; padding-left:30px; }
-.tag-toggle{
-  background: var(--bg-elevated); border: 1.5px solid var(--border); color: var(--ink-3);
-  padding: 3px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 600;
-  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.03em;
-  transition: color .15s, border-color .15s, background .15s;
-}
-.tag-toggle:hover{ border-color: var(--ink-3); color: var(--ink-2); }
-.tag-toggle.is-active{ background: var(--pink-dim); border-color: var(--pink); color: var(--pink-ink); }
+.set-entry{ display:flex; flex-direction:column; gap:5px; }
+.set-entry.is-dropset .set-row{ opacity: 0.88; }
+.set-entry.is-dropset .set-idx{ color: var(--pink-ink); font-weight:700; }
+.set-entry.is-dropset input{ border-style: dashed; }
 
-.drop-rows{ display:flex; flex-direction:column; gap:6px; padding-left:30px; margin-top:2px; }
-.drop-row{
-  display:grid; grid-template-columns: 16px 1fr 1fr 30px; gap:8px; align-items:center;
+.warmup-check{
+  display:flex; align-items:center; gap:6px; padding-left:30px;
+  font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: 0.03em;
 }
-.drop-row .drop-arrow{ font-size: 0.8rem; color: var(--ink-3); text-align:center; }
-.drop-row input{
-  width:100%; background: var(--bg-elevated); border: 1.5px dashed var(--border);
-  color: var(--ink); border-radius: var(--radius-sm); padding: 7px 8px;
-  font-family: var(--font-mono); font-size: 0.9rem; text-align:center;
-}
-.drop-row input:focus{ outline:none; border-color: var(--pink); }
-.drop-row input::placeholder{ color: var(--ink-3); }
-.add-drop-btn{
-  align-self:flex-start; background:none; border:none; color: var(--ink-3);
-  font-family: var(--font-mono); font-size: 0.7rem; font-weight:600; text-decoration: underline;
-  text-underline-offset: 2px; padding: 2px 0;
-}
-.add-drop-btn:hover{ color: var(--pink-ink); }
+.warmup-check input[type="checkbox"]{ width:14px; height:14px; accent-color: var(--pink); }
 
 .add-set-btn{
-  margin-top: 8px; align-self:flex-start;
+  align-self:flex-start; margin-top: 8px;
   background: var(--bg-elevated); border: 1.5px dashed var(--border); color: var(--ink-2);
   padding: 7px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 600;
 }
 .add-set-btn:hover{ border-color: var(--ink-3); color: var(--ink); }
+.set-add-row{ display:flex; gap:8px; flex-wrap: wrap; margin-top: 8px; }
+.set-add-row .add-set-btn{ margin-top: 0; }
+.add-dropset-btn{ border-color: var(--pink); color: var(--pink-ink); }
+.add-dropset-btn:hover{ border-color: var(--pink-ink); }
 
 .set-labels{
   display:grid; grid-template-columns: 22px 1fr 1fr 30px; gap:8px;
