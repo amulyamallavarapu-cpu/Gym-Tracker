@@ -188,9 +188,9 @@ input, select{ font-family: inherit; }
 .ex-card.is-done{ background: var(--sage-dim); border-color: rgba(51,83,28,0.15); }
 
 .ex-card-head{
-  display:flex; align-items:flex-start; justify-content:space-between; gap: 10px; margin-bottom: 12px;
+  display:flex; align-items:flex-start; gap: 10px; margin-bottom: 12px;
 }
-.ex-name-wrap{ display:flex; flex-direction:column; gap:3px; }
+.ex-name-wrap{ display:flex; flex-direction:column; gap:3px; flex:1; min-width:0; }
 .ex-name{ font-weight: 600; font-size: 1.02rem; font-family: var(--font-display); }
 .ex-target{ font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2); }
 
@@ -202,6 +202,14 @@ input, select{ font-family: inherit; }
   transition: color .15s, border-color .15s, background .15s;
 }
 .icon-btn:hover{ color: var(--ink); border-color: var(--ink-3); background: var(--bg-card); }
+
+.drag-handle{
+  flex-shrink:0; width: 26px; height: 32px; display:flex; align-items:center; justify-content:center;
+  background:none; border:none; color: var(--ink-3); cursor: grab; touch-action: none; padding:0;
+}
+.drag-handle:hover{ color: var(--ink-2); }
+.drag-handle:active{ cursor: grabbing; }
+.draggable-item.is-dragging{ position: relative; z-index: 30; box-shadow: var(--shadow-card), 0 10px 24px rgba(0,0,0,0.18); opacity: 0.96; }
 
 .set-rows{ display:flex; flex-direction:column; gap:7px; }
 .set-row{
@@ -242,8 +250,6 @@ input, select{ font-family: inherit; }
 .add-set-btn:hover{ border-color: var(--ink-3); color: var(--ink); }
 .set-add-row{ display:flex; gap:8px; flex-wrap: wrap; margin-top: 8px; }
 .set-add-row .add-set-btn{ margin-top: 0; }
-.add-dropset-btn{ border-color: var(--pink); color: var(--pink-ink); }
-.add-dropset-btn:hover{ border-color: var(--pink-ink); }
 
 .set-labels{
   display:grid; grid-template-columns: 22px 1fr 1fr 30px; gap:8px;
@@ -300,6 +306,7 @@ input, select{ font-family: inherit; }
 }
 .chart-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; flex-wrap: wrap; gap:6px; }
 .chart-card-head h3{ margin:0; font-size: 1rem; font-weight:600; font-family: var(--font-display); }
+.chart-canvas-wrap{ position: relative; width: 100%; height: 220px; }
 
 .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 .stat-box{
@@ -376,14 +383,15 @@ input, select{ font-family: inherit; }
 .program-day-head .dot{ width:11px; height:11px; border-radius:50%; }
 .program-day-head h3{ margin:0; font-size: 1.15rem; font-family: var(--font-display); font-weight: 600; }
 .program-ex-row{
-  display:flex; align-items:center; justify-content:space-between;
+  display:flex; align-items:center; gap:8px;
   padding: 10px 0; border-bottom: 1px solid rgba(43,38,32,0.08);
 }
 .program-ex-row:last-child{ border-bottom:none; }
-.program-ex-info{ display:flex; flex-direction:column; }
+.program-ex-info{ display:flex; flex-direction:column; flex:1; min-width:0; }
 .program-ex-info .pname{ font-weight:600; font-size:0.92rem; }
 .program-ex-info .ptarget{ font-family: var(--font-mono); font-size:0.7rem; color: var(--ink-2); }
-.program-ex-btns{ display:flex; gap:6px; }
+.program-ex-btns{ display:flex; gap:6px; flex-shrink:0; }
+.program-ex-row .drag-handle{ height: auto; }
 
 /* ============ HISTORY VIEW ============ */
 .history-list{ display:flex; flex-direction:column; gap:12px; }
@@ -400,7 +408,10 @@ input, select{ font-family: inherit; }
 .history-detail.is-open{ display:block; }
 .history-ex-line{ display:flex; justify-content:space-between; font-size: 0.82rem; padding: 5px 0; }
 .history-ex-line .hex-sets{ font-family: var(--font-mono); color: var(--ink-2); }
-.history-delete{ margin-top: 10px; background:none; border:none; color: var(--ink-3); font-size: 0.75rem; text-decoration: underline; }
+.history-detail-actions{ margin-top: 10px; display:flex; align-items:center; gap:14px; }
+.history-edit{ background:none; border:none; color: var(--ink-2); font-size: 0.75rem; text-decoration: underline; }
+.history-edit:hover{ color: var(--ink); }
+.history-delete{ margin-top: 0; background:none; border:none; color: var(--ink-3); font-size: 0.75rem; text-decoration: underline; }
 .history-delete:hover{ color: var(--pink-ink); }
 
 .empty-state{
@@ -437,7 +448,7 @@ input, select{ font-family: inherit; }
 .swap-option:hover{ border-color: var(--pink); }
 .swap-option.is-current{ border-color: var(--pink); background: var(--pink-dim); }
 
-.custom-add{ display:flex; gap:8px; }
+.custom-add{ display:flex; gap:8px; margin-bottom: 14px; }
 .text-input{
   width:100%; background: var(--bg-card); border: 1.5px solid var(--border); color: var(--ink);
   border-radius: var(--radius-sm); padding: 11px 14px; font-size: 1rem; margin-bottom: 10px;

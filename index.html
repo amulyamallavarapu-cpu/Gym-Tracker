@@ -80,18 +80,10 @@
 
       <div class="card chart-card">
         <div class="chart-card-head">
-          <h3>Volume over time</h3>
-          <span class="muted">total weight × reps per session</span>
-        </div>
-        <canvas id="volumeChart" height="180"></canvas>
-      </div>
-
-      <div class="card chart-card">
-        <div class="chart-card-head">
           <h3>Exercise progress</h3>
           <select id="exerciseSelect" class="select-mono"></select>
         </div>
-        <canvas id="exerciseChart" height="180"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="exerciseChart"></canvas></div>
         <div id="exerciseHistoryTable" class="pr-table exercise-history-table"></div>
       </div>
 
@@ -101,6 +93,14 @@
           <span class="muted">est. 1RM (Epley)</span>
         </div>
         <div id="prTable" class="pr-table"></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-card-head">
+          <h3>Volume over time</h3>
+          <span class="muted">total weight × reps per session</span>
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="volumeChart"></canvas></div>
       </div>
     </section>
 
@@ -170,11 +170,11 @@
       <button class="icon-btn" id="closeSwapModal">✕</button>
     </div>
     <div class="modal-body">
-      <div id="swapOptions" class="swap-options"></div>
       <div class="custom-add">
-        <input type="text" id="customExerciseInput" placeholder="Or type a custom exercise…" class="text-input">
+        <input type="text" id="customExerciseInput" placeholder="Search or add an exercise…" class="text-input">
         <button class="btn-secondary" id="addCustomExercise">Add</button>
       </div>
+      <div id="swapOptions" class="swap-options"></div>
     </div>
   </div>
 </div>
@@ -267,6 +267,23 @@
       </div>
 
       <button class="btn-primary btn-full" id="saveLogEntryBtn" style="margin-top:18px;">Save entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EDIT SESSION MODAL (edit an already-logged workout) ===== -->
+<div class="modal-backdrop" id="editSessionModalBackdrop" hidden>
+  <div class="modal" id="editSessionModal">
+    <div class="modal-head">
+      <h3>Edit session</h3>
+      <button class="icon-btn" id="closeEditSessionModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-copy" id="editSessionDayName"></p>
+      <label class="field-label">Date</label>
+      <input type="date" id="editSessionDate" class="text-input">
+      <div id="editSessionExerciseList"></div>
+      <button class="btn-primary btn-full" id="saveEditSessionBtn" style="margin-top:18px;">Save changes</button>
     </div>
   </div>
 </div>

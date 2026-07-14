@@ -147,6 +147,83 @@ function updateStreakBadge(){
   document.getElementById("streakCount").textContent = computeStreak();
 }
 
+/* ---------------------------------------------------------------------- */
+/* DRAG-TO-REORDER (touch + mouse friendly, via Pointer Events)           */
+/* ---------------------------------------------------------------------- */
+function reorderDayExercises(day, newOrderIds){
+  const map = new Map(day.exercises.map(ex => [ex.id, ex]));
+  const reordered = newOrderIds.map(id => map.get(id)).filter(Boolean);
+  if(reordered.length === day.exercises.length){
+    day.exercises = reordered;
+    saveState();
+  }
+}
+
+// Attaches drag-to-reorder to every ".drag-handle" currently inside `container`.
+// Items must be direct children of `container`, each with class "draggable-item"
+// and a data-drag-id attribute. Calls onReorder(newOrderIdsArray) on drop.
+function enableDragReorder(container, onReorder){
+  container.querySelectorAll(".drag-handle").forEach(handle => {
+    handle.addEventListener("pointerdown", (e) => {
+      const item = handle.closest(".draggable-item");
+      if(!item) return;
+      e.preventDefault();
+      const pointerId = e.pointerId;
+      let startY = e.clientY;
+      try{ item.setPointerCapture(pointerId); }catch(err){}
+      item.classList.add("is-dragging");
+
+      const onMove = (ev) => {
+        if(ev.pointerId !== pointerId) return;
+        const offsetY = ev.clientY - startY;
+        item.style.transform = `translateY(${offsetY}px)`;
+
+        const items = Array.from(container.children);
+        const dragIndex = items.indexOf(item);
+        const dragRect = item.getBoundingClientRect();
+        const dragCenter = dragRect.top + dragRect.height / 2;
+
+        for(let i = 0; i < items.length; i++){
+          const sib = items[i];
+          if(sib === item) continue;
+          const rect = sib.getBoundingClientRect();
+          const center = rect.top + rect.height / 2;
+          if(i < dragIndex && dragCenter < center){
+            container.insertBefore(item, sib);
+            startY = ev.clientY;
+            item.style.transform = "";
+            break;
+          }
+          if(i > dragIndex && dragCenter > center){
+            container.insertBefore(item, sib.nextSibling);
+            startY = ev.clientY;
+            item.style.transform = "";
+            break;
+          }
+        }
+      };
+
+      const onUp = (ev) => {
+        if(ev.pointerId !== pointerId) return;
+        try{ item.releasePointerCapture(pointerId); }catch(err){}
+        item.classList.remove("is-dragging");
+        item.style.transform = "";
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        const newOrder = Array.from(container.children).map(el => el.dataset.dragId);
+        onReorder(newOrder);
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  });
+}
+
+function dragHandleSvg(){
+  return `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>`;
+}
+
 function getLastPerformance(exerciseName){
   // state.history is newest-first, so the first match is the most recent session
   for(const sess of state.history){
@@ -174,10 +251,12 @@ function renderToday(){
 
     const card = document.createElement("div");
     const allDone = draft.length > 0 && draft.every(s => s.weight !== "" && s.reps !== "");
-    card.className = "ex-card" + (allDone ? " is-done" : "");
+    card.className = "ex-card draggable-item" + (allDone ? " is-done" : "");
+    card.dataset.dragId = ex.id;
 
     card.innerHTML = `
       <div class="ex-card-head">
+        <button class="drag-handle" type="button" title="Drag to reorder">${dragHandleSvg()}</button>
         <div class="ex-name-wrap">
           <span class="ex-name">${ex.name}</span>
           <span class="ex-target">TARGET ${ex.sets} × ${ex.reps}${ex.timed ? "" : ""}</span>
@@ -227,6 +306,10 @@ function renderToday(){
   document.getElementById("setsCompleteCount").textContent = completeSets;
   document.getElementById("setsTotalCount").textContent = totalSets;
   updateProgressRing();
+  enableDragReorder(list, (newOrder) => {
+    reorderDayExercises(day, newOrder);
+    renderToday();
+  });
 }
 
 function buildTodaySetRow(day, ex, draft, idx, card, rowsWrap){
@@ -405,30 +488,28 @@ function openSwapModal(dayId, exId){
   const ex = findExercise(dayId, exId);
   const curated = getSwapOptions(ex.name);
   const customOnes = (state.exerciseLibrary || []).filter(n => !curated.includes(n));
+  const allOptions = [...curated, ...customOnes];
   const wrap = document.getElementById("swapOptions");
   wrap.innerHTML = "";
-  curated.forEach(name => {
+  allOptions.forEach(name => {
     const btn = document.createElement("button");
     btn.className = "swap-option" + (name === ex.name ? " is-current" : "");
     btn.textContent = name;
+    btn.dataset.searchName = name.toLowerCase();
     btn.addEventListener("click", () => applySwap(name));
     wrap.appendChild(btn);
   });
-  if(customOnes.length > 0){
-    const divider = document.createElement("div");
-    divider.className = "modal-divider";
-    divider.textContent = "from your library";
-    wrap.appendChild(divider);
-    customOnes.forEach(name => {
-      const btn = document.createElement("button");
-      btn.className = "swap-option" + (name === ex.name ? " is-current" : "");
-      btn.textContent = name;
-      btn.addEventListener("click", () => applySwap(name));
-      wrap.appendChild(btn);
-    });
-  }
-  document.getElementById("customExerciseInput").value = "";
+  const input = document.getElementById("customExerciseInput");
+  input.value = "";
+  filterSwapOptions("");
   document.getElementById("swapModalBackdrop").hidden = false;
+}
+
+function filterSwapOptions(query){
+  const q = query.trim().toLowerCase();
+  document.querySelectorAll("#swapOptions .swap-option").forEach(btn => {
+    btn.hidden = q !== "" && !btn.dataset.searchName.includes(q);
+  });
 }
 function closeSwapModal(){ document.getElementById("swapModalBackdrop").hidden = true; ui.swapTarget = null; }
 document.getElementById("closeSwapModal").addEventListener("click", closeSwapModal);
@@ -447,6 +528,10 @@ function applySwap(newName){
   if(ui.activeView === "today") renderToday();
   if(ui.activeView === "program") renderProgram();
 }
+
+document.getElementById("customExerciseInput").addEventListener("input", (e) => {
+  filterSwapOptions(e.target.value);
+});
 
 document.getElementById("addCustomExercise").addEventListener("click", () => {
   const input = document.getElementById("customExerciseInput");
@@ -512,8 +597,10 @@ function renderProgram(){
     const body = block.querySelector(".program-ex-body");
     day.exercises.forEach(ex => {
       const row = document.createElement("div");
-      row.className = "program-ex-row";
+      row.className = "program-ex-row draggable-item";
+      row.dataset.dragId = ex.id;
       row.innerHTML = `
+        <button class="drag-handle" type="button" title="Drag to reorder">${dragHandleSvg()}</button>
         <div class="program-ex-info">
           <span class="pname">${ex.name}</span>
           <span class="ptarget">${ex.sets} × ${ex.reps}</span>
@@ -531,6 +618,10 @@ function renderProgram(){
     });
     block.querySelector('[data-action="add-exercise"]').addEventListener("click", () => addExerciseToDay(day.id));
     wrap.appendChild(block);
+    enableDragReorder(body, (newOrder) => {
+      reorderDayExercises(day, newOrder);
+      renderProgram();
+    });
   });
 }
 
@@ -676,15 +767,23 @@ function buildSessionCard(sess){
         </div>
       `).join("")}
       <div class="history-ex-line"><span class="muted">Total volume</span><span class="hex-sets">${Math.round(totalVolume)} kg</span></div>
-      <button class="history-delete" data-action="delete">Delete session</button>
+      <div class="history-detail-actions">
+        <button class="history-edit" data-action="edit">Edit</button>
+        <button class="history-delete" data-action="delete">Delete session</button>
+      </div>
     </div>
   `;
   card.querySelector('[data-action="toggle"]').addEventListener("click", () => {
     ui.openHistoryId = isOpen ? null : sess.id;
     renderHistory();
   });
+  card.querySelector('[data-action="edit"]')?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openEditSessionModal(sess.id);
+  });
   card.querySelector('[data-action="delete"]')?.addEventListener("click", (e) => {
     e.stopPropagation();
+    if(!confirm("Delete this session? This can't be undone.")) return;
     state.history = state.history.filter(s => s.id !== sess.id);
     saveState();
     renderHistory();
@@ -717,12 +816,19 @@ function buildActivityCard(log, dateKey){
     <div class="history-detail ${isOpen ? "is-open" : ""}">
       ${log.steps ? `<div class="history-ex-line"><span>Steps</span><span class="hex-sets">${Number(log.steps).toLocaleString()}</span></div>` : ""}
       ${activityLines}
-      <button class="history-delete" data-action="delete">Delete entry</button>
+      <div class="history-detail-actions">
+        <button class="history-edit" data-action="edit">Edit</button>
+        <button class="history-delete" data-action="delete">Delete entry</button>
+      </div>
     </div>
   `;
   card.querySelector('[data-action="toggle"]').addEventListener("click", () => {
     ui.openHistoryId = isOpen ? null : syntheticId;
     renderHistory();
+  });
+  card.querySelector('[data-action="edit"]')?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openEditActivityModal(dateKey);
   });
   card.querySelector('[data-action="delete"]')?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -763,6 +869,29 @@ function openLogEntryModal(){
 
 function closeLogEntryModal(){
   document.getElementById("logEntryModalBackdrop").hidden = true;
+}
+
+function openEditActivityModal(dateKey){
+  const log = state.dailyLogs[dateKey];
+  if(!log) return;
+
+  logEntryState = { type: "activity", workoutDayId: state.program[0].id, workoutSets: {}, activities: [], editingActivityDateKey: dateKey };
+  document.getElementById("logEntryDate").value = dateKey;
+
+  const daySelect = document.getElementById("logEntryDaySelect");
+  daySelect.innerHTML = state.program.map(d => `<option value="${d.id}">${d.name}</option>`).join("");
+  daySelect.value = logEntryState.workoutDayId;
+  renderLogEntryWorkoutExercises();
+
+  document.getElementById("logEntrySteps").value = log.steps != null ? log.steps : "";
+  logEntryState.activities = (log.activities || []).map(a => ({
+    id: uid("act"), type: a.type, duration: String(a.duration), distance: a.distance != null ? String(a.distance) : ""
+  }));
+  if(logEntryState.activities.length === 0) addLogEntryActivityRow();
+  else renderLogEntryActivities();
+
+  setLogEntryType("activity");
+  document.getElementById("logEntryModalBackdrop").hidden = false;
 }
 
 function setLogEntryType(type){
@@ -947,15 +1076,164 @@ document.getElementById("saveLogEntryBtn").addEventListener("click", () => {
       toast("Add steps or at least one activity");
       return;
     }
+    if(logEntryState.editingActivityDateKey && logEntryState.editingActivityDateKey !== dateVal){
+      delete state.dailyLogs[logEntryState.editingActivityDateKey];
+    }
     state.dailyLogs[dateVal] = {
       steps: stepsVal ? parseInt(stepsVal, 10) : null,
       activities
     };
     saveState();
     closeLogEntryModal();
-    toast("Entry logged 📝");
+    toast(logEntryState.editingActivityDateKey ? "Entry updated ✏️" : "Entry logged 📝");
     if(ui.activeView === "history") renderHistory();
   }
+});
+
+/* ---------------------------------------------------------------------- */
+/* EDIT SESSION MODAL (edit an already-logged workout)                    */
+/* ---------------------------------------------------------------------- */
+function dateToInputValue(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+let editSessionState = { sessionId: null, exercises: [] };
+
+function openEditSessionModal(sessId){
+  const sess = state.history.find(s => s.id === sessId);
+  if(!sess) return;
+
+  editSessionState = {
+    sessionId: sess.id,
+    exercises: sess.exercises.map(ex => ({
+      name: ex.name,
+      timed: !!ex.timed,
+      sets: ex.sets.map(s => ({
+        weight: String(s.weight), reps: String(s.reps),
+        warmup: !!s.warmup, isDropset: !!s.isDropset
+      }))
+    }))
+  };
+
+  document.getElementById("editSessionDayName").textContent = sess.dayName;
+  document.getElementById("editSessionDate").value = dateToInputValue(new Date(sess.date));
+  renderEditSessionExercises();
+  document.getElementById("editSessionModalBackdrop").hidden = false;
+}
+
+function closeEditSessionModal(){
+  document.getElementById("editSessionModalBackdrop").hidden = true;
+}
+
+function renderEditSessionExercises(){
+  const wrap = document.getElementById("editSessionExerciseList");
+  wrap.innerHTML = "";
+  editSessionState.exercises.forEach((ex, exIdx) => {
+    const block = document.createElement("div");
+    block.className = "log-entry-exercise";
+    block.innerHTML = `
+      <span class="le-name">${ex.name}</span>
+      <div class="set-rows" data-exidx="${exIdx}"></div>
+      <div class="set-add-row">
+        <button class="add-set-btn" data-action="add-set" type="button">+ Add set</button>
+        <button class="add-set-btn add-dropset-btn" data-action="add-dropset" type="button">+ Add dropset</button>
+      </div>
+    `;
+    wrap.appendChild(block);
+    renderEditSessionSetRows(exIdx);
+    block.querySelector('[data-action="add-set"]').addEventListener("click", () => {
+      ex.sets.push({ weight:"", reps: ex.timed ? "1" : "", warmup:false, isDropset:false });
+      renderEditSessionSetRows(exIdx);
+    });
+    block.querySelector('[data-action="add-dropset"]').addEventListener("click", () => {
+      ex.sets.push({ weight:"", reps: ex.timed ? "1" : "", warmup:false, isDropset:true });
+      renderEditSessionSetRows(exIdx);
+    });
+  });
+}
+
+function renderEditSessionSetRows(exIdx){
+  const ex = editSessionState.exercises[exIdx];
+  const sets = ex.sets;
+  const rowsWrap = document.querySelector(`#editSessionExerciseList .set-rows[data-exidx="${exIdx}"]`);
+  rowsWrap.innerHTML = "";
+  sets.forEach((s, idx) => {
+    const entry = document.createElement("div");
+    entry.className = "set-entry" + (s.isDropset ? " is-dropset" : "");
+    const idxLabel = s.isDropset ? "↳" : String(idx + 1);
+    entry.innerHTML = `
+      <div class="set-row">
+        <span class="set-idx">${idxLabel}</span>
+        <input type="number" inputmode="decimal" placeholder="${ex.timed ? "sec" : "kg"}" value="${s.weight}" data-field="weight" data-idx="${idx}">
+        <input type="number" inputmode="numeric" placeholder="${ex.timed ? "—" : "reps"}" value="${s.reps}" data-field="reps" data-idx="${idx}" ${ex.timed ? "disabled" : ""}>
+        <button class="set-remove" data-action="remove-set" data-idx="${idx}" type="button">✕</button>
+      </div>
+      ${idx === 0 ? `
+        <label class="warmup-check">
+          <input type="checkbox" data-action="toggle-warmup" ${s.warmup ? "checked" : ""}>
+          First set is a warmup
+        </label>
+      ` : ""}
+    `;
+    rowsWrap.appendChild(entry);
+    entry.querySelectorAll(".set-row input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        sets[Number(inp.dataset.idx)][inp.dataset.field] = inp.value;
+      });
+    });
+    entry.querySelector('[data-action="remove-set"]').addEventListener("click", () => {
+      sets.splice(idx, 1);
+      renderEditSessionSetRows(exIdx);
+    });
+    const warmupCheck = entry.querySelector('[data-action="toggle-warmup"]');
+    if(warmupCheck){
+      warmupCheck.addEventListener("change", () => {
+        s.warmup = warmupCheck.checked;
+      });
+    }
+  });
+}
+
+document.getElementById("closeEditSessionModal").addEventListener("click", closeEditSessionModal);
+document.getElementById("editSessionModalBackdrop").addEventListener("click", e => {
+  if(e.target.id === "editSessionModalBackdrop") closeEditSessionModal();
+});
+
+document.getElementById("saveEditSessionBtn").addEventListener("click", () => {
+  const sess = state.history.find(s => s.id === editSessionState.sessionId);
+  if(!sess){ closeEditSessionModal(); return; }
+
+  const dateVal = document.getElementById("editSessionDate").value;
+  if(!dateVal){ toast("Pick a date first"); return; }
+
+  const updatedExercises = [];
+  editSessionState.exercises.forEach(ex => {
+    const validSets = ex.sets
+      .filter(s => s.weight !== "" && s.reps !== "")
+      .map(s => ({
+        weight: parseFloat(s.weight),
+        reps: parseFloat(s.reps),
+        warmup: !!s.warmup,
+        isDropset: !!s.isDropset
+      }));
+    if(validSets.length > 0){
+      updatedExercises.push({ name: ex.name, sets: validSets, timed: ex.timed });
+    }
+  });
+
+  if(updatedExercises.length === 0){
+    toast("Keep at least one set logged");
+    return;
+  }
+
+  sess.date = isoAtNoonFromDateInput(dateVal);
+  sess.exercises = updatedExercises;
+  sortHistoryDesc();
+  saveState();
+  closeEditSessionModal();
+  toast("Session updated ✏️");
+  if(ui.activeView === "history") renderHistory();
+  if(ui.activeView === "stats") renderStats();
 });
 
 /* ---------------------------------------------------------------------- */
@@ -1023,10 +1301,8 @@ function renderStats(){
 
   const grid = document.getElementById("statGrid");
   grid.innerHTML = `
-    <div class="stat-box"><span class="stat-num">${totalWorkouts}</span><span class="stat-label">Total sessions</span></div>
     <div class="stat-box"><span class="stat-num">${thisWeek}</span><span class="stat-label">This week</span></div>
     <div class="stat-box"><span class="stat-num">${streak}</span><span class="stat-label">Day streak</span></div>
-    <div class="stat-box"><span class="stat-num">${Math.round(totalVolume/1000)}k</span><span class="stat-label">Total volume (kg)</span></div>
   `;
 
   renderVolumeChart();
@@ -1132,6 +1408,7 @@ function renderExerciseChart(){
 function chartBaseOptions(){
   return {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
       x: { ticks: { color: "#8a8073", font: { family: "JetBrains Mono", size: 10 } }, grid: { color: "#f3e9db" } },
