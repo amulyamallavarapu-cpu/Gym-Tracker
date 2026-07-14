@@ -310,6 +310,8 @@ function renderToday(){
     reorderDayExercises(day, newOrder);
     renderToday();
   });
+
+  document.getElementById("addExerciseTodayBtn").onclick = () => openAddExerciseModal(day.id);
 }
 
 function buildTodaySetRow(day, ex, draft, idx, card, rowsWrap){
@@ -378,16 +380,7 @@ function renderTodaySetRows(day, ex, rowsWrap, card){
 }
 
 function addExerciseToDay(dayId){
-  const name = prompt("Exercise name:");
-  if(!name || !name.trim()) return;
-  const trimmed = name.trim();
-  const day = findDay(dayId);
-  day.exercises.push({ id: uid("ex"), name: trimmed, sets: 3, reps: "8-12", timed: false });
-  if(!state.exerciseLibrary) state.exerciseLibrary = [];
-  if(!getMasterExerciseList().includes(trimmed)) state.exerciseLibrary.push(trimmed);
-  saveState();
-  toast(`Added "${trimmed}" to ${day.name}`);
-  renderProgram();
+  openAddExerciseModal(dayId);
 }
 
 function deleteExerciseFromDay(dayId, exId){
@@ -484,25 +477,40 @@ function finishSession(){
 /* SWAP MODAL                                                              */
 /* ---------------------------------------------------------------------- */
 function openSwapModal(dayId, exId){
-  ui.swapTarget = { dayId, exId };
+  ui.swapTarget = { dayId, exId, mode: "swap" };
   const ex = findExercise(dayId, exId);
   const curated = getSwapOptions(ex.name);
   const customOnes = (state.exerciseLibrary || []).filter(n => !curated.includes(n));
   const allOptions = [...curated, ...customOnes];
+  document.getElementById("swapModalTitle").textContent = "Swap exercise";
+  renderSwapOptionButtons(allOptions, ex.name);
+  const input = document.getElementById("customExerciseInput");
+  input.value = "";
+  filterSwapOptions("");
+  document.getElementById("swapModalBackdrop").hidden = false;
+}
+
+function openAddExerciseModal(dayId){
+  ui.swapTarget = { dayId, exId: null, mode: "add" };
+  document.getElementById("swapModalTitle").textContent = "Add exercise";
+  renderSwapOptionButtons(getMasterExerciseList(), null);
+  const input = document.getElementById("customExerciseInput");
+  input.value = "";
+  filterSwapOptions("");
+  document.getElementById("swapModalBackdrop").hidden = false;
+}
+
+function renderSwapOptionButtons(names, currentName){
   const wrap = document.getElementById("swapOptions");
   wrap.innerHTML = "";
-  allOptions.forEach(name => {
+  names.forEach(name => {
     const btn = document.createElement("button");
-    btn.className = "swap-option" + (name === ex.name ? " is-current" : "");
+    btn.className = "swap-option" + (name === currentName ? " is-current" : "");
     btn.textContent = name;
     btn.dataset.searchName = name.toLowerCase();
     btn.addEventListener("click", () => applySwap(name));
     wrap.appendChild(btn);
   });
-  const input = document.getElementById("customExerciseInput");
-  input.value = "";
-  filterSwapOptions("");
-  document.getElementById("swapModalBackdrop").hidden = false;
 }
 
 function filterSwapOptions(query){
@@ -516,6 +524,19 @@ document.getElementById("closeSwapModal").addEventListener("click", closeSwapMod
 document.getElementById("swapModalBackdrop").addEventListener("click", e => { if(e.target.id === "swapModalBackdrop") closeSwapModal(); });
 
 function applySwap(newName){
+  if(!ui.swapTarget) return;
+
+  if(ui.swapTarget.mode === "add"){
+    const day = findDay(ui.swapTarget.dayId);
+    day.exercises.push({ id: uid("ex"), name: newName, sets: 3, reps: "8-12", timed: false });
+    saveState();
+    closeSwapModal();
+    toast(`Added "${newName}" to ${day.name}`);
+    if(ui.activeView === "today") renderToday();
+    if(ui.activeView === "program") renderProgram();
+    return;
+  }
+
   const { dayId, exId } = ui.swapTarget;
   const ex = findExercise(dayId, exId);
   const oldDraft = state.draftsByDay[dayId] && state.draftsByDay[dayId][exId];
@@ -1261,7 +1282,7 @@ function computeStats(){
   const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
   const thisWeek = state.history.filter(s => new Date(s.date) >= weekAgo).length;
   const totalVolume = state.history.reduce((sum, sess) =>
-    sum + sess.exercises.reduce((s2, ex) => s2 + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s3, s) => s3 + s.weight * s.reps, 0)), 0), 0);
+    sum + (sess.exercises || []).reduce((s2, ex) => s2 + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s3, s) => s3 + s.weight * s.reps, 0)), 0), 0);
   const streak = computeStreak();
   return { totalWorkouts, thisWeek, totalVolume, streak };
 }
@@ -1269,7 +1290,7 @@ function computeStats(){
 function computePRs(){
   const prs = {};
   state.history.forEach(sess => {
-    sess.exercises.forEach(ex => {
+    (sess.exercises || []).forEach(ex => {
       if(ex.timed) return;
       flattenCountableSets(ex).forEach(s => {
         const oneRM = s.weight * (1 + s.reps / 30); // Epley
@@ -1286,7 +1307,7 @@ function getAllExerciseNames(){
   const seen = new Set();
   const ordered = [];
   // state.history is newest-first, so this naturally orders by most recently logged
-  state.history.forEach(sess => sess.exercises.forEach(ex => {
+  state.history.forEach(sess => (sess.exercises || []).forEach(ex => {
     if(!ex.timed && !seen.has(ex.name)){
       seen.add(ex.name);
       ordered.push(ex.name);
@@ -1296,7 +1317,14 @@ function getAllExerciseNames(){
 }
 
 function renderStats(){
-  const { totalWorkouts, thisWeek, totalVolume, streak } = computeStats();
+  let stats;
+  try{
+    stats = computeStats();
+  }catch(err){
+    console.error("computeStats failed", err);
+    stats = { totalWorkouts: 0, thisWeek: 0, totalVolume: 0, streak: 0 };
+  }
+  const { thisWeek, streak } = stats;
   document.getElementById("streakCount").textContent = streak;
 
   const grid = document.getElementById("statGrid");
@@ -1305,16 +1333,16 @@ function renderStats(){
     <div class="stat-box"><span class="stat-num">${streak}</span><span class="stat-label">Day streak</span></div>
   `;
 
-  renderVolumeChart();
-  renderExerciseSelectAndChart();
-  renderPRTable();
+  try{ renderVolumeChart(); }catch(err){ console.error("renderVolumeChart failed", err); }
+  try{ renderExerciseSelectAndChart(); }catch(err){ console.error("renderExerciseSelectAndChart failed", err); }
+  try{ renderPRTable(); }catch(err){ console.error("renderPRTable failed", err); }
 }
 
 function renderVolumeChart(){
   const ctx = document.getElementById("volumeChart");
   const sessions = [...state.history].reverse().slice(-20);
   const labels = sessions.map(s => new Date(s.date).toLocaleDateString(undefined, {month:"short", day:"numeric"}));
-  const data = sessions.map(s => Math.round(s.exercises.reduce((sum, ex) => sum + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s2, st) => s2 + st.weight*st.reps, 0)), 0)));
+  const data = sessions.map(s => Math.round((s.exercises || []).reduce((sum, ex) => sum + (ex.timed ? 0 : flattenCountableSets(ex).reduce((s2, st) => s2 + st.weight*st.reps, 0)), 0)));
 
   if(ui.charts.volume) ui.charts.volume.destroy();
   if(sessions.length === 0){
@@ -1350,7 +1378,7 @@ function renderExerciseSelectAndChart(){
   document.getElementById("exerciseChart").hidden = false;
   select.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join("");
   select.value = names.includes(prevVal) ? prevVal : names[0];
-  select.onchange = renderExerciseChart;
+  select.onchange = () => { try{ renderExerciseChart(); }catch(err){ console.error("renderExerciseChart failed", err); } };
   renderExerciseChart();
 }
 
@@ -1366,8 +1394,8 @@ function renderExerciseChart(){
   const points = [];
   const tableRows = []; // newest first, for the list below the chart
   [...state.history].reverse().forEach(sess => {
-    sess.exercises.forEach(ex => {
-      if(ex.name === name && !ex.timed && ex.sets.length){
+    (sess.exercises || []).forEach(ex => {
+      if(ex.name === name && !ex.timed && ex.sets && ex.sets.length){
         const countable = flattenCountableSets(ex);
         if(countable.length === 0) return;
         const top = Math.max(...countable.map(s => s.weight));
@@ -1376,8 +1404,8 @@ function renderExerciseChart(){
     });
   });
   state.history.forEach(sess => {
-    sess.exercises.forEach(ex => {
-      if(ex.name === name && !ex.timed && ex.sets.length){
+    (sess.exercises || []).forEach(ex => {
+      if(ex.name === name && !ex.timed && ex.sets && ex.sets.length){
         tableRows.push({ date: new Date(sess.date), sets: ex.sets });
       }
     });
