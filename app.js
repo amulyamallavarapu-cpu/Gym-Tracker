@@ -43,11 +43,13 @@ function loadState(){
       program: defaultProgram(),
       history: [],
       currentDayId: null,
-      draftsByDay: {}
+      draftsByDay: {},
+      todayOverrides: {}
     };
   }
   if(!loaded.dailyLogs) loaded.dailyLogs = {};
   if(!loaded.exerciseLibrary) loaded.exerciseLibrary = [];
+  if(!loaded.todayOverrides) loaded.todayOverrides = {};
   return loaded;
 }
 
@@ -80,6 +82,28 @@ function findDay(dayId){ return state.program.find(d => d.id === dayId); }
 function findExercise(dayId, exId){
   const day = findDay(dayId);
   return day ? day.exercises.find(e => e.id === exId) : null;
+}
+
+// Today's session works off a lazily-created, independent copy of the day's
+// exercises, so swapping/adding/removing/reordering/editing targets from the
+// Today tab never touches the actual Program template. The copy is discarded
+// (reverting to the Program's real layout) once the session is finished.
+function getSessionExercises(day){
+  if(!state.todayOverrides) state.todayOverrides = {};
+  if(!state.todayOverrides[day.id]){
+    state.todayOverrides[day.id] = day.exercises.map(ex => ({ ...ex }));
+  }
+  return state.todayOverrides[day.id];
+}
+function resetSessionOverride(dayId){
+  if(state.todayOverrides) delete state.todayOverrides[dayId];
+}
+// source is "today" (session-only copy) or "program" (the real template)
+function findExerciseIn(dayId, exId, source){
+  const day = findDay(dayId);
+  if(!day) return null;
+  const list = source === "today" ? getSessionExercises(day) : day.exercises;
+  return list.find(e => e.id === exId) || null;
 }
 
 function getDraft(dayId, exId, targetSets, timed){
@@ -155,6 +179,16 @@ function reorderDayExercises(day, newOrderIds){
   const reordered = newOrderIds.map(id => map.get(id)).filter(Boolean);
   if(reordered.length === day.exercises.length){
     day.exercises = reordered;
+    saveState();
+  }
+}
+
+function reorderSessionExercises(day, newOrderIds){
+  const list = getSessionExercises(day);
+  const map = new Map(list.map(ex => [ex.id, ex]));
+  const reordered = newOrderIds.map(id => map.get(id)).filter(Boolean);
+  if(reordered.length === list.length){
+    state.todayOverrides[day.id] = reordered;
     saveState();
   }
 }
@@ -243,8 +277,9 @@ function renderToday(){
   list.innerHTML = "";
 
   let totalSets = 0, completeSets = 0;
+  const exercises = getSessionExercises(day);
 
-  day.exercises.forEach(ex => {
+  exercises.forEach(ex => {
     const draft = getDraft(day.id, ex.id, ex.sets, ex.timed);
     totalSets += draft.length;
     completeSets += draft.filter(s => s.weight !== "" && s.reps !== "").length;
@@ -296,9 +331,9 @@ function renderToday(){
       const inputs = rowsWrap.querySelectorAll("input:not([disabled])");
       if(inputs.length) inputs[inputs.length - 1].focus();
     });
-    card.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id));
-    card.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(day.id, ex.id));
-    card.querySelector('[data-action="delete-ex"]').addEventListener("click", () => deleteExerciseFromDay(day.id, ex.id));
+    card.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id, "today"));
+    card.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(day.id, ex.id, "today"));
+    card.querySelector('[data-action="delete-ex"]').addEventListener("click", () => deleteExerciseFromDay(day.id, ex.id, "today"));
 
     list.appendChild(card);
   });
@@ -307,11 +342,11 @@ function renderToday(){
   document.getElementById("setsTotalCount").textContent = totalSets;
   updateProgressRing();
   enableDragReorder(list, (newOrder) => {
-    reorderDayExercises(day, newOrder);
+    reorderSessionExercises(day, newOrder);
     renderToday();
   });
 
-  document.getElementById("addExerciseTodayBtn").onclick = () => openAddExerciseModal(day.id);
+  document.getElementById("addExerciseTodayBtn").onclick = () => openAddExerciseModal(day.id, "today");
 }
 
 function buildTodaySetRow(day, ex, draft, idx, card, rowsWrap){
@@ -380,16 +415,22 @@ function renderTodaySetRows(day, ex, rowsWrap, card){
 }
 
 function addExerciseToDay(dayId){
-  openAddExerciseModal(dayId);
+  openAddExerciseModal(dayId, "program");
 }
 
-function deleteExerciseFromDay(dayId, exId){
+function deleteExerciseFromDay(dayId, exId, source){
   const day = findDay(dayId);
-  const ex = findExercise(dayId, exId);
+  const list = source === "today" ? getSessionExercises(day) : day.exercises;
+  const ex = list.find(e => e.id === exId);
   if(!ex) return;
-  if(!confirm(`Remove "${ex.name}" from ${day.name}? Past logged sessions won't be affected.`)) return;
+  const scopeNote = source === "today" ? "for today's session" : "from the program";
+  if(!confirm(`Remove "${ex.name}" ${scopeNote}? Past logged sessions won't be affected.`)) return;
 
-  day.exercises = day.exercises.filter(e => e.id !== exId);
+  if(source === "today"){
+    state.todayOverrides[dayId] = list.filter(e => e.id !== exId);
+  } else {
+    day.exercises = list.filter(e => e.id !== exId);
+  }
   if(state.draftsByDay[dayId]) delete state.draftsByDay[dayId][exId];
   saveState();
   toast(`Removed "${ex.name}"`);
@@ -400,7 +441,7 @@ function deleteExerciseFromDay(dayId, exId){
 function updateProgressRing(){
   const day = findDay(ui.activeDayId);
   let total = 0, done = 0;
-  day.exercises.forEach(ex => {
+  getSessionExercises(day).forEach(ex => {
     const draft = getDraft(day.id, ex.id, ex.sets, ex.timed);
     total += draft.length;
     done += draft.filter(s => s.weight !== "" && s.reps !== "").length;
@@ -437,7 +478,7 @@ document.getElementById("finishSessionBtn").addEventListener("click", finishSess
 function finishSession(){
   const day = findDay(ui.activeDayId);
   const loggedExercises = [];
-  day.exercises.forEach(ex => {
+  getSessionExercises(day).forEach(ex => {
     const draft = getDraft(day.id, ex.id, ex.sets, ex.timed);
     const validSets = draft
       .filter(s => s.weight !== "" && s.reps !== "")
@@ -468,6 +509,7 @@ function finishSession(){
   state.history.unshift(session);
   sortHistoryDesc();
   state.draftsByDay[day.id] = {};
+  resetSessionOverride(day.id); // revert Today back to the Program's real layout
   saveState();
   toast("Session saved 🏁");
   renderToday();
@@ -476,9 +518,9 @@ function finishSession(){
 /* ---------------------------------------------------------------------- */
 /* SWAP MODAL                                                              */
 /* ---------------------------------------------------------------------- */
-function openSwapModal(dayId, exId){
-  ui.swapTarget = { dayId, exId, mode: "swap" };
-  const ex = findExercise(dayId, exId);
+function openSwapModal(dayId, exId, source){
+  ui.swapTarget = { dayId, exId, mode: "swap", source };
+  const ex = findExerciseIn(dayId, exId, source);
   const curated = getSwapOptions(ex.name);
   const customOnes = (state.exerciseLibrary || []).filter(n => !curated.includes(n));
   const allOptions = [...curated, ...customOnes];
@@ -490,8 +532,8 @@ function openSwapModal(dayId, exId){
   document.getElementById("swapModalBackdrop").hidden = false;
 }
 
-function openAddExerciseModal(dayId){
-  ui.swapTarget = { dayId, exId: null, mode: "add" };
+function openAddExerciseModal(dayId, source){
+  ui.swapTarget = { dayId, exId: null, mode: "add", source };
   document.getElementById("swapModalTitle").textContent = "Add exercise";
   renderSwapOptionButtons(getMasterExerciseList(), null);
   const input = document.getElementById("customExerciseInput");
@@ -525,10 +567,12 @@ document.getElementById("swapModalBackdrop").addEventListener("click", e => { if
 
 function applySwap(newName){
   if(!ui.swapTarget) return;
+  const { dayId, source } = ui.swapTarget;
+  const day = findDay(dayId);
+  const list = source === "today" ? getSessionExercises(day) : day.exercises;
 
   if(ui.swapTarget.mode === "add"){
-    const day = findDay(ui.swapTarget.dayId);
-    day.exercises.push({ id: uid("ex"), name: newName, sets: 3, reps: "8-12", timed: false });
+    list.push({ id: uid("ex"), name: newName, sets: 3, reps: "8-12", timed: false });
     saveState();
     closeSwapModal();
     toast(`Added "${newName}" to ${day.name}`);
@@ -537,8 +581,9 @@ function applySwap(newName){
     return;
   }
 
-  const { dayId, exId } = ui.swapTarget;
-  const ex = findExercise(dayId, exId);
+  const { exId } = ui.swapTarget;
+  const ex = list.find(e => e.id === exId);
+  if(!ex){ closeSwapModal(); return; }
   const oldDraft = state.draftsByDay[dayId] && state.draftsByDay[dayId][exId];
   ex.name = newName;
   // reset in-progress draft for this slot since exercise changed
@@ -566,9 +611,9 @@ document.getElementById("addCustomExercise").addEventListener("click", () => {
 /* ---------------------------------------------------------------------- */
 /* EDIT TARGETS MODAL                                                      */
 /* ---------------------------------------------------------------------- */
-function openEditModal(dayId, exId){
-  ui.editTarget = { dayId, exId };
-  const ex = findExercise(dayId, exId);
+function openEditModal(dayId, exId, source){
+  ui.editTarget = { dayId, exId, source };
+  const ex = findExerciseIn(dayId, exId, source);
   document.getElementById("editSetsInput").value = ex.sets;
   document.getElementById("editRepsInput").value = ex.reps;
   document.getElementById("editModalBackdrop").hidden = false;
@@ -578,8 +623,9 @@ document.getElementById("closeEditModal").addEventListener("click", closeEditMod
 document.getElementById("editModalBackdrop").addEventListener("click", e => { if(e.target.id === "editModalBackdrop") closeEditModal(); });
 
 document.getElementById("saveEditTargets").addEventListener("click", () => {
-  const { dayId, exId } = ui.editTarget;
-  const ex = findExercise(dayId, exId);
+  const { dayId, exId, source } = ui.editTarget;
+  const ex = findExerciseIn(dayId, exId, source);
+  if(!ex) { closeEditModal(); return; }
   const newSets = Math.max(1, parseInt(document.getElementById("editSetsInput").value) || ex.sets);
   const newReps = document.getElementById("editRepsInput").value.trim() || ex.reps;
   ex.sets = newSets;
@@ -632,9 +678,9 @@ function renderProgram(){
           <button class="icon-btn" data-action="delete-ex" title="Remove from program"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m3 0v13a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       `;
-      row.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(day.id, ex.id));
-      row.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id));
-      row.querySelector('[data-action="delete-ex"]').addEventListener("click", () => deleteExerciseFromDay(day.id, ex.id));
+      row.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(day.id, ex.id, "program"));
+      row.querySelector('[data-action="swap"]').addEventListener("click", () => openSwapModal(day.id, ex.id, "program"));
+      row.querySelector('[data-action="delete-ex"]').addEventListener("click", () => deleteExerciseFromDay(day.id, ex.id, "program"));
       body.appendChild(row);
     });
     block.querySelector('[data-action="add-exercise"]').addEventListener("click", () => addExerciseToDay(day.id));
@@ -1346,10 +1392,12 @@ function renderVolumeChart(){
 
   if(ui.charts.volume) ui.charts.volume.destroy();
   if(sessions.length === 0){
-    ctx.parentElement.querySelector(".chart-empty")?.remove();
+    ctx.parentElement?.querySelector(".chart-empty")?.remove();
     return;
   }
-  ui.charts.volume = new Chart(ctx, {
+  ctx.hidden = false;
+  ctx.parentElement?.querySelector(".chart-empty")?.remove();
+  ui.charts.volume = safeCreateChart(ctx, {
     type: "line",
     data: { labels, datasets: [{
       data, borderColor: "#ef6f9b", backgroundColor: "rgba(239,111,155,0.22)",
@@ -1411,18 +1459,30 @@ function renderExerciseChart(){
     });
   });
 
-  ui.charts.exercise = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: points.map(p => p.date.toLocaleDateString(undefined, {month:"short", day:"numeric"})),
-      datasets: [{
-        data: points.map(p => p.weight),
-        borderColor: "#7b87d9", backgroundColor: "rgba(183,192,240,0.35)",
-        fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: "#7b87d9"
-      }]
-    },
-    options: chartBaseOptions()
-  });
+  const wrap = ctx.parentElement;
+  wrap.querySelector(".chart-empty")?.remove();
+
+  if(points.length === 0){
+    ctx.hidden = true;
+    const empty = document.createElement("div");
+    empty.className = "chart-empty";
+    empty.innerHTML = `<p>No sets logged for this exercise yet (warmup-only sets aren't charted).</p>`;
+    wrap.appendChild(empty);
+  } else {
+    ctx.hidden = false;
+    ui.charts.exercise = safeCreateChart(ctx, {
+      type: "line",
+      data: {
+        labels: points.map(p => p.date.toLocaleDateString(undefined, {month:"short", day:"numeric"})),
+        datasets: [{
+          data: points.map(p => p.weight),
+          borderColor: "#7b87d9", backgroundColor: "rgba(183,192,240,0.35)",
+          fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: "#7b87d9"
+        }]
+      },
+      options: chartBaseOptions()
+    });
+  }
 
   const tableWrap = document.getElementById("exerciseHistoryTable");
   tableWrap.innerHTML = tableRows.slice(0, 8).map(row => `
@@ -1431,6 +1491,54 @@ function renderExerciseChart(){
       <span class="pr-value">${formatExerciseSets({ sets: row.sets, timed: false })}</span>
     </div>
   `).join("");
+}
+
+// Creates a Chart.js instance defensively: if a prior chart on this canvas
+// wasn't fully cleaned up (e.g. a previous render threw partway through),
+// Chart.js refuses to reuse the canvas ("Canvas is already in use") and the
+// graph silently never appears again. Chart.getChart() finds any chart still
+// registered against the canvas (even one our own ui.charts reference lost
+// track of) so we can destroy it and retry once.
+// Creates a Chart.js instance defensively: if a prior chart on this canvas
+// wasn't fully cleaned up (e.g. a previous render threw partway through),
+// Chart.js refuses to reuse the canvas ("Canvas is already in use") and the
+// graph silently never appears again. Chart.getChart() finds any chart still
+// registered against the canvas (even one our own ui.charts reference lost
+// track of) so we can destroy it and retry once. If it still can't render
+// (e.g. the chart library failed to load), show a visible message instead
+// of leaving a silent blank box.
+function safeCreateChart(ctx, config){
+  if(typeof Chart === "undefined"){
+    showChartFallback(ctx, "Chart library failed to load — check your connection and reload the page.");
+    return null;
+  }
+  try{
+    return new Chart(ctx, config);
+  }catch(err){
+    console.error("Chart creation failed, attempting recovery", err);
+    try{
+      const existing = typeof Chart.getChart === "function" ? Chart.getChart(ctx) : null;
+      if(existing) existing.destroy();
+    }catch(err2){}
+    try{
+      return new Chart(ctx, config);
+    }catch(err3){
+      console.error("Chart creation failed again after recovery", err3);
+      showChartFallback(ctx, "Couldn't display this chart. Try reloading the page.");
+      return null;
+    }
+  }
+}
+
+function showChartFallback(ctx, message){
+  const wrap = ctx.parentElement;
+  if(!wrap) return;
+  wrap.querySelector(".chart-empty")?.remove();
+  ctx.hidden = true;
+  const empty = document.createElement("div");
+  empty.className = "chart-empty";
+  empty.innerHTML = `<p>${message}</p>`;
+  wrap.appendChild(empty);
 }
 
 function chartBaseOptions(){

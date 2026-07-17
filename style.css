@@ -307,6 +307,8 @@ input, select{ font-family: inherit; }
 .chart-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; flex-wrap: wrap; gap:6px; }
 .chart-card-head h3{ margin:0; font-size: 1rem; font-weight:600; font-family: var(--font-display); }
 .chart-canvas-wrap{ position: relative; width: 100%; height: 220px; }
+.chart-empty{ display:flex; align-items:center; justify-content:center; height:100%; text-align:center; }
+.chart-empty p{ color: var(--ink-3); font-size: 0.85rem; max-width: 260px; margin:0; }
 
 .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 .stat-box{
